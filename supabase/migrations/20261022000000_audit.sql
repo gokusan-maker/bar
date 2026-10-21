@@ -1,5 +1,7 @@
 -- 操作履歴（誰が・いつ・何をしたか）
 
+set search_path = bar, public;
+
 create table if not exists audit_logs (
   id uuid primary key default gen_random_uuid(),
   actor text not null check (actor in ('owner', 'staff', 'guest', 'system')),

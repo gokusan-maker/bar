@@ -1,5 +1,7 @@
 -- 売上・スタッフ・バック・証拠写真
 
+set search_path = bar, public;
+
 create table if not exists staff (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -36,7 +38,7 @@ create table if not exists sale_attachments (
   file_name text not null,
   content_type text not null,
   size integer not null,
-  -- Supabase Storage（evidence バケット）内のパス
+  -- Supabase Storage（bar-evidence バケット）内のパス
   storage_path text not null,
   created_at timestamptz not null default clock_timestamp()
 );
@@ -48,5 +50,5 @@ alter table sale_attachments enable row level security;
 
 -- 証拠写真の保存先（非公開。サーバーが service_role で読み書きする）
 insert into storage.buckets (id, name, public)
-values ('evidence', 'evidence', false)
+values ('bar-evidence', 'bar-evidence', false)
 on conflict (id) do nothing;

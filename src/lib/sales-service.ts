@@ -4,7 +4,7 @@ import type { Attachment, BackRates, Channel, Sale } from "./domain/types";
 import type { Repository } from "./repo/types";
 import { businessDateOf } from "./reservation-service";
 
-/** Vercelのリクエスト上限（4.5MB）に収まるサイズ */
+/** スマホの写真を縮小した後に十分収まる上限（一度に送れる量は next.config の bodySizeLimit） */
 export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_SALE = 10;
 
