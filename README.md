@@ -29,7 +29,7 @@ SNS（LINE・Instagram）のメッセージで届いた予約を自動で読み�
 | 今夜のまとめ | 予約一覧の先頭に、今夜の組数・人数・承認待ちと、時間ごとの席の埋まり具合を表示 |
 | スマホ用の下部タブ | 予約・売上・お客様・メッセージ・設定をアプリのように切り替え |
 | 店のカスタマイズ | 店の種類、席の構成（カウンター・テーブル・個室など自由に追加）、チャージ額、サービス料率、バックの対象（SNS経由のみ／全売上） |
-| スタッフ用ログイン | `STAFF_PASSWORD` でログインすると、予約一覧の閲覧と来店チェックだけできる（売上・設定・メッセージは見えない） |
+| スタッフ用ログイン | スタッフは予約一覧の閲覧と来店チェックだけできる（売上・設定・メッセージは見えない）。「スタッフ」画面の登録用リンクを送ると、スタッフが自分の名前とパスワードを登録し、店主が承認するとログインできる。店主がパスワードを決めることも、共通の `STAFF_PASSWORD` を使うこともできる。在籍を外す・ログインを止めると、すぐにログアウトされる |
 | 開店前の通知 | 毎日17時に今夜の予約一覧を店主のLINEへ。Googleカレンダーに反映できなかった予約も自動で再同期 |
 | 予約の編集 | 店主が日時・人数・名前・要望を変更。カレンダーも更新し、お客様に変更を連絡（任意） |
 | 予約の集計 | 月ごとの受付数、SNS経由の割合、無断キャンセル率、キャンセル率、平均人数、曜日別の件数 |
@@ -58,7 +58,7 @@ http://localhost:3000/admin/simulator を開き、「土曜の9時から2名で�
 
 ### 1. Supabase（データベース）
 1. https://supabase.com でプロジェクトを作成
-2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
+2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
 3. Project Settings → Data API → **Exposed schemas に `bar` を追加**して保存（しないとアプリから表が見えません）
 4. Project Settings → API の URL と `service_role` キーを `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` に設定
 5. `TOKEN_ENCRYPTION_KEY` に長いランダム文字列を設定（例: `openssl rand -base64 32`）

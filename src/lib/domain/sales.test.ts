@@ -7,6 +7,8 @@ const staff = (id: string, rates: Partial<Staff["backRates"]> = {}, active = tru
   name: `スタッフ${id}`,
   backRates: { drink: 10, charge: 0, service: 0, perVisit: 0, ...rates },
   active,
+  passwordHash: null,
+  pending: false,
   createdAt: "",
 });
 

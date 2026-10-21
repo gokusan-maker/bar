@@ -80,7 +80,8 @@ function messenger(): Messenger {
   };
 }
 
-function notifier(): Notifier {
+/** 店主への通知（LINE）。OWNER_LINE_USER_ID がなければログに出すだけ */
+export function notifier(): Notifier {
   const line = lineClient();
   const owner = env("OWNER_LINE_USER_ID");
   return {

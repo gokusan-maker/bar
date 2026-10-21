@@ -8,6 +8,8 @@ import { repository, salesService } from "@/lib/container";
 import { saleTotal } from "@/lib/domain/sales";
 import type { AuditLog, Channel } from "@/lib/domain/types";
 import { validateBackRates, type SaleInput } from "@/lib/sales-service";
+import { hashPassword } from "@/lib/password";
+import { newInviteCode, normalizeStaffName, passwordProblem } from "@/lib/staff-accounts";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 /** "6,000" や "６０００" も受け付ける。空欄は0 */
@@ -124,14 +126,60 @@ export async function saveStaffAction(formData: FormData) {
   if (invalid) go("/admin/staff", { error: invalid });
   const repo = repository();
   const rates = `お酒${backRates.drink}% 料金${backRates.charge}% サービス料${backRates.service}% 固定${backRates.perVisit}円`;
+  // 店主がログイン用パスワードを決める場合（空なら変えない）
+  const password = String(formData.get("password") ?? "");
+  const disableLogin = formData.get("disableLogin") === "on";
+  if (password) {
+    const problem = passwordProblem(password);
+    if (problem) go("/admin/staff", { error: problem });
+    const key = normalizeStaffName(name);
+    const clash = (await repo.listStaff()).some((s) => s.id !== id && (s.passwordHash || s.pending) && normalizeStaffName(s.name) === key);
+    if (clash) go("/admin/staff", { error: `「${name}」はほかのスタッフがログインに使っています。名前を変えてください` });
+  }
+  const login = disableLogin
+    ? { passwordHash: null, pending: false }
+    : password
+      ? { passwordHash: hashPassword(password), pending: false }
+      : {};
+  const loginNote = disableLogin ? "（ログインを止めた）" : password ? "（パスワードを設定）" : "";
   if (id) {
-    await repo.updateStaff(id, { name, backRates, active: formData.get("active") === "on" });
-    await audit("スタッフを更新", "staff", id, `${name} ${rates}`);
+    await repo.updateStaff(id, { name, backRates, active: formData.get("active") === "on", ...login });
+    await audit("スタッフを更新", "staff", id, `${name} ${rates}${loginNote}`);
   } else {
-    const created = await repo.createStaff({ name, backRates, active: true });
-    await audit("スタッフを追加", "staff", created.id, `${name} ${rates}`);
+    const created = await repo.createStaff({ name, backRates, active: true, passwordHash: null, pending: false, ...login });
+    await audit("スタッフを追加", "staff", created.id, `${name} ${rates}${loginNote}`);
   }
   go("/admin/staff", { saved: "1" });
+}
+
+/** 招待リンクからの登録申請を承認・却下する */
+export async function reviewStaffAction(formData: FormData) {
+  await requireAdmin();
+  const id = str(formData, "id");
+  const repo = repository();
+  const s = await repo.getStaff(id);
+  if (!s?.pending) go("/admin/staff");
+  if (str(formData, "op") === "approve") {
+    await repo.updateStaff(id, { pending: false, active: true });
+    await audit("スタッフ登録を承認", "staff", id, s.name);
+    go("/admin/staff", { saved: "approved" });
+  }
+  // 却下：パスワードを消す。バック率が未設定（申請で新しく作られた）なら在籍も外して選択肢に出さない
+  const unset = Object.values(s.backRates).every((v) => v === 0);
+  await repo.updateStaff(id, { pending: false, passwordHash: null, ...(unset ? { active: false } : {}) });
+  await audit("スタッフ登録を却下", "staff", id, s.name);
+  go("/admin/staff", { saved: "rejected" });
+}
+
+/** 招待リンクを作る・作り直す・止める */
+export async function staffInviteAction(formData: FormData) {
+  await requireAdmin();
+  const repo = repository();
+  const settings = await repo.getSettings();
+  const stop = str(formData, "op") === "stop";
+  await repo.saveSettings({ ...settings, staffInviteCode: stop ? "" : newInviteCode() });
+  await audit(stop ? "スタッフ招待リンクを停止" : "スタッフ招待リンクを発行", "settings", null);
+  go("/admin/staff", { saved: stop ? "invite-stopped" : "invite" });
 }
 
 export async function setCustomerStaffAction(formData: FormData) {

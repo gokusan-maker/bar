@@ -25,6 +25,7 @@ import type {
   ReservationQuery,
   SalePatch,
   SaleQuery,
+  NewStaff,
 } from "./types";
 
 /** 1つのSupabaseプロジェクトに他のアプリと同居させるため、表は bar スキーマ、写真は bar-evidence バケットに置く */
@@ -54,6 +55,8 @@ const toStaff = (r: any): Staff => ({
   name: r.name,
   backRates: { drink: 0, charge: 0, service: 0, perVisit: 0, ...r.back_rates },
   active: r.active,
+  passwordHash: r.password_hash ?? null,
+  pending: r.pending ?? false,
   createdAt: r.created_at,
 });
 
@@ -361,11 +364,17 @@ export class SupabaseRepository implements Repository {
     const row = check(await this.db.from("staff").select().eq("id", id).maybeSingle());
     return row ? toStaff(row) : null;
   }
-  async createStaff(input: Omit<Staff, "id" | "createdAt">) {
+  async createStaff(input: NewStaff) {
     const row = check(
       await this.db
         .from("staff")
-        .insert({ name: input.name, back_rates: input.backRates, active: input.active })
+        .insert({
+          name: input.name,
+          back_rates: input.backRates,
+          active: input.active,
+          password_hash: input.passwordHash ?? null,
+          pending: input.pending ?? false,
+        })
         .select()
         .single(),
     );
@@ -376,6 +385,8 @@ export class SupabaseRepository implements Repository {
     if (patch.name !== undefined) row.name = patch.name;
     if (patch.backRates !== undefined) row.back_rates = patch.backRates;
     if (patch.active !== undefined) row.active = patch.active;
+    if (patch.passwordHash !== undefined) row.password_hash = patch.passwordHash;
+    if (patch.pending !== undefined) row.pending = patch.pending;
     return toStaff(check(await this.db.from("staff").update(row).eq("id", id).select().single()));
   }
 

@@ -6,7 +6,7 @@ async function loginAction(formData: FormData) {
   "use server";
   const ip = await clientIp();
   if (await isLockedOut(ip)) redirect("/login?error=locked");
-  if (await login(String(formData.get("password") ?? ""))) redirect("/admin");
+  if (await login(String(formData.get("password") ?? ""), String(formData.get("staffName") ?? ""))) redirect("/admin");
   await recordFailure(ip);
   redirect("/login?error=1");
 }
@@ -30,11 +30,16 @@ export default async function LoginPage({
       {error === "locked" && (
         <p className="notice error">ログインの失敗が続いたため、しばらく（15分ほど）ログインできません。</p>
       )}
-      {error === "1" && <p className="notice error">パスワードが違います</p>}
+      {error === "1" && <p className="notice error">名前かパスワードが違います（スタッフの方は、店主の承認が済んでいるかもご確認ください）</p>}
       <form action={loginAction} className="card">
         <label>
+          お名前（スタッフの方）
+          <input name="staffName" autoComplete="username" maxLength={30} />
+          <span className="muted">店主の方は空欄のままにしてください</span>
+        </label>
+        <label>
           パスワード
-          <input type="password" name="password" required autoFocus autoComplete="current-password" />
+          <input type="password" name="password" required autoComplete="current-password" />
         </label>
         <button className="primary" type="submit">
           ログイン

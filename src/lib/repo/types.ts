@@ -55,6 +55,10 @@ export interface ReservationQuery {
 /**
  * 永続化の抽象。開発・テスト用のメモリ実装と、本番用のSupabase実装がある。
  */
+/** ログイン関係は省略するとログインなし */
+export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending"> &
+  Partial<Pick<Staff, "passwordHash" | "pending">>;
+
 export interface Repository {
   getSettings(): Promise<ShopSettings>;
   saveSettings(settings: ShopSettings): Promise<void>;
@@ -94,7 +98,7 @@ export interface Repository {
 
   listStaff(): Promise<Staff[]>;
   getStaff(id: string): Promise<Staff | null>;
-  createStaff(input: Omit<Staff, "id" | "createdAt">): Promise<Staff>;
+  createStaff(input: NewStaff): Promise<Staff>;
   updateStaff(id: string, patch: Partial<Omit<Staff, "id" | "createdAt">>): Promise<Staff>;
 
   createSale(input: NewSale): Promise<Sale>;

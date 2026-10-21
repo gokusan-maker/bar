@@ -150,6 +150,8 @@ export interface ShopSettings {
   shopMessage: string;
   /** LINE公式アカウントの友だち追加URL（https://lin.ee/...）。フォームや投稿でLINEへ案内する */
   lineFriendUrl: string;
+  /** スタッフ招待リンクの合言葉。空なら招待リンクからの登録を受け付けない */
+  staffInviteCode: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -183,6 +185,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   shopPhone: "",
   shopMessage: "",
   lineFriendUrl: "",
+  staffInviteCode: "",
 };
 
 /** バック率（%）と1組あたりの固定バック（円） */
@@ -198,6 +201,10 @@ export interface Staff {
   name: string;
   backRates: BackRates;
   active: boolean;
+  /** スタッフ自身のログイン用パスワードのハッシュ。null ならログインできない */
+  passwordHash: string | null;
+  /** 招待リンクから登録し、店主の承認を待っている */
+  pending: boolean;
   createdAt: string;
 }
 
