@@ -22,6 +22,7 @@ import type {
   ReservationQuery,
   SalePatch,
   SaleQuery,
+  NewStaff,
 } from "./types";
 
 /**
@@ -184,8 +185,15 @@ export class MemoryRepository implements Repository {
     const s = this.staff.get(id);
     return s ? { ...s, backRates: { ...s.backRates } } : null;
   }
-  async createStaff(input: Omit<Staff, "id" | "createdAt">) {
-    const s: Staff = { ...input, backRates: { ...input.backRates }, id: randomUUID(), createdAt: this.stamp() };
+  async createStaff(input: NewStaff) {
+    const s: Staff = {
+      passwordHash: null,
+      pending: false,
+      ...input,
+      backRates: { ...input.backRates },
+      id: randomUUID(),
+      createdAt: this.stamp(),
+    };
     this.staff.set(s.id, s);
     return { ...s };
   }

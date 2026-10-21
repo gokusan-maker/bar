@@ -1,8 +1,11 @@
 import "server-only";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
+import { repository } from "./container";
 import { sign, verifySigned } from "./crypto";
+import { authenticateStaff, canLogin } from "./staff-accounts";
 
 const COOKIE = "bar_admin";
 const SESSION_DAYS = 30;
@@ -20,21 +23,38 @@ export function authMode(): AuthMode {
 
 export type Role = "owner" | "staff";
 
+/** パスワードを変えたら、そのスタッフの古いログインが切れるようにするための目印 */
+const fingerprint = (passwordHash: string) => createHash("sha256").update(passwordHash).digest("base64url").slice(0, 12);
+
+export interface Session {
+  role: Role;
+  /** 自分のパスワードでログインしたスタッフの名前 */
+  staffName: string | null;
+}
+
 /** ログイン中の権限。owner=店主（全操作）、staff=スタッフ（予約の閲覧と来店チェックのみ） */
-export async function currentRole(): Promise<Role | null> {
+export const currentSession = cache(async (): Promise<Session | null> => {
   const mode = authMode();
-  if (mode === "open-dev") return "owner";
+  if (mode === "open-dev") return { role: "owner", staffName: null };
   if (mode === "misconfigured") return null;
   const value = (await cookies()).get(COOKIE)?.value;
   const payload = verifySigned(value, process.env.SESSION_SECRET!);
   if (!payload) return null;
-  const [role, exp] = payload.split(":");
+  const [role, exp, staffId, fp] = payload.split(":");
   const expiresAt = Number(exp);
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
   // 旧形式 "admin:..." は店主として扱う
-  if (role === "owner" || role === "admin") return "owner";
-  if (role === "staff" && process.env.STAFF_PASSWORD) return "staff";
-  return null;
+  if (role === "owner" || role === "admin") return { role: "owner", staffName: null };
+  if (role !== "staff") return null;
+  if (!staffId) return process.env.STAFF_PASSWORD ? { role: "staff", staffName: null } : null;
+  // 店主が在籍を外したり、パスワードを変えたりしたら、すぐにログインできなくなる
+  const s = await repository().getStaff(staffId);
+  if (!s || !canLogin(s) || fingerprint(s.passwordHash!) !== fp) return null;
+  return { role: "staff", staffName: s.name };
+});
+
+export async function currentRole(): Promise<Role | null> {
+  return (await currentSession())?.role ?? null;
 }
 
 /** 店主かどうか（店主専用の画面・操作・APIで使う） */
@@ -63,16 +83,24 @@ const matches = (input: string, expected: string | undefined) => {
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
-export async function login(password: string): Promise<boolean> {
+/**
+ * 名前が空なら店主（ADMIN_PASSWORD）か共通のスタッフ用パスワード（STAFF_PASSWORD）、
+ * 名前があればスタッフ本人のパスワードで確認する。
+ */
+export async function login(password: string, staffName = ""): Promise<boolean> {
   if (authMode() !== "password") return false;
-  const role: Role | null = matches(password, process.env.ADMIN_PASSWORD)
-    ? "owner"
-    : matches(password, process.env.STAFF_PASSWORD)
-      ? "staff"
-      : null;
-  if (!role) return false;
+  let payload: string | null = null;
   const expiresAt = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
-  (await cookies()).set(COOKIE, sign(`${role}:${expiresAt}`, process.env.SESSION_SECRET!), {
+  if (staffName.trim()) {
+    const s = await authenticateStaff(repository(), staffName, password);
+    if (s) payload = `staff:${expiresAt}:${s.id}:${fingerprint(s.passwordHash!)}`;
+  } else if (matches(password, process.env.ADMIN_PASSWORD)) {
+    payload = `owner:${expiresAt}`;
+  } else if (matches(password, process.env.STAFF_PASSWORD)) {
+    payload = `staff:${expiresAt}`;
+  }
+  if (!payload) return false;
+  (await cookies()).set(COOKIE, sign(payload, process.env.SESSION_SECRET!), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

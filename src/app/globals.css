@@ -569,3 +569,29 @@ button.chip {
   font-weight: 600;
   margin-bottom: 16px;
 }
+
+/* 印刷・PDF用（スタッフ別バック明細）。画面の色設定に関係なく白地に黒で出す */
+.print-sheet {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  background: #fff;
+  color: #111;
+  min-height: 100vh;
+}
+.print-sheet h1 { font-size: 1.4rem; margin-bottom: 4px; }
+.print-sheet h2 { font-size: 1.05rem; margin: 24px 0 8px; }
+.print-sheet .muted { color: #555; }
+.print-sheet table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.print-sheet th,
+.print-sheet td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; color: #111; background: #fff; }
+.print-sheet th { background: #f0f0f0; }
+.print-sheet td:nth-child(n + 2) { white-space: nowrap; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .print-sheet { padding: 0; max-width: none; min-height: 0; }
+  .print-staff { break-inside: avoid; }
+  .print-sheet tr { break-inside: avoid; }
+}

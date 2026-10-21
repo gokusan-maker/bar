@@ -12,12 +12,14 @@ export interface Check {
 }
 
 /** テーブルと、それを作るSQLファイル */
-const TABLES: [string, string][] = [
+/** [表, 作成するSQL, 確認する列（追加の列だけのSQLもあるため）] */
+const TABLES: [string, string, string?][] = [
   ["reservations", "20261020000000_init.sql"],
   ["sales", "20261021000000_sales.sql"],
   ["audit_logs", "20261022000000_audit.sql"],
   ["login_failures", "20261023000000_privacy.sql"],
   ["web_requests", "20261024000000_web_booking.sql"],
+  ["staff", "20261027000000_staff_login.sql", "password_hash"],
 ];
 
 /** よくある失敗を、店主にわかる言葉にする */
@@ -71,8 +73,8 @@ export async function runDiagnostics(): Promise<Check[]> {
       if (!env("TOKEN_ENCRYPTION_KEY")) return { name: "データベース（Supabase）", status: "error", detail: "TOKEN_ENCRYPTION_KEY が未設定です" };
       const db = supabaseClient(url, key);
       const missing: string[] = [];
-      for (const [table, file] of TABLES) {
-        const { error } = await db.from(table).select("*", { count: "exact", head: true });
+      for (const [table, file, column] of TABLES) {
+        const { error } = await db.from(table).select(column ?? "*", { count: "exact", head: true });
         // bar スキーマがAPIに公開されていないと、どの表も読めない
         if (error?.code === "PGRST106") {
           return { name: "データベース（Supabase）", status: "error", detail: `Supabaseの Project Settings → Data API → Exposed schemas に「${DB_SCHEMA}」を追加してください` };

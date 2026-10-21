@@ -55,7 +55,7 @@ export default async function SalePage({
             {member!.name}さんに {yen(back.total)}
             <span className="muted">
               {" "}
-              （お酒 {yen(back.drink)} ＋ 料金 {yen(back.charge)} ＋ サービス料 {yen(back.service)} ＋ 固定 {yen(back.perVisit)}）
+              （売上全体 {yen(saleTotal(sale))} × {member!.backRates.rate}% ＝ {yen(back.byRate)}{back.perVisit ? ` ＋ 固定 ${yen(back.perVisit)}` : ""}）
             </span>
           </>
         ) : (

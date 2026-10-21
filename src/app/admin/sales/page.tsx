@@ -77,9 +77,14 @@ export default async function SalesPage({
       <section className="card">
         <div className="row spread">
           <h2 style={{ margin: 0 }}>スタッフ別バック</h2>
-          <a className="button" href={`/api/reports/monthly?month=${month}`}>
-            CSVダウンロード
-          </a>
+          <div className="row">
+            <a className="button" href={`/api/reports/monthly?month=${month}`}>
+              CSV
+            </a>
+            <Link className="button" href={`/print/back?month=${month}`}>
+              PDF
+            </Link>
+          </div>
         </div>
         {report.staff.length === 0 ? (
           <p className="muted">
@@ -93,9 +98,8 @@ export default async function SalesPage({
                   <th>スタッフ</th>
                   <th>組数</th>
                   <th>対象売上</th>
-                  <th>お酒</th>
-                  <th>料金</th>
-                  <th>サービス料</th>
+                  <th>バック率</th>
+                  <th>率によるバック</th>
                   <th>固定</th>
                   <th>バック合計</th>
                 </tr>
@@ -106,9 +110,8 @@ export default async function SalesPage({
                     <td>{r.staff.name}</td>
                     <td>{r.sales.count}</td>
                     <td>{yen(r.sales.total)}</td>
-                    <td>{yen(r.back.drink)}</td>
-                    <td>{yen(r.back.charge)}</td>
-                    <td>{yen(r.back.service)}</td>
+                    <td>{r.staff.backRates.rate}%</td>
+                    <td>{yen(r.back.byRate)}</td>
                     <td>{yen(r.back.perVisit)}</td>
                     <td>
                       <strong>{yen(r.back.total)}</strong>

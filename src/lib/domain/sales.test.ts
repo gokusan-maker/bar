@@ -5,8 +5,10 @@ import type { Sale, Staff } from "./types";
 const staff = (id: string, rates: Partial<Staff["backRates"]> = {}, active = true): Staff => ({
   id,
   name: `スタッフ${id}`,
-  backRates: { drink: 10, charge: 0, service: 0, perVisit: 0, ...rates },
+  backRates: { rate: 10, perVisit: 0, ...rates },
   active,
+  passwordHash: null,
+  pending: false,
   createdAt: "",
 });
 
@@ -36,16 +38,11 @@ describe("sales calculations", () => {
     expect(serviceCharge(5000, 2000, 0)).toBe(0);
   });
 
-  it("computes back per category plus a fixed amount per visit", () => {
-    expect(backForSale(sale({}), { drink: 20, charge: 10, service: 5, perVisit: 500 })).toEqual({
-      drink: 1000,
-      charge: 200,
-      service: 35,
-      perVisit: 500,
-      total: 1735,
-    });
-    // 円未満は項目ごとに切り捨て
-    expect(backForSale(sale({ drinkAmount: 999 }), { drink: 15, charge: 0, service: 0, perVisit: 0 }).drink).toBe(149);
+  it("applies the back rate to the whole sale including the service charge, plus a fixed amount", () => {
+    // 5000 + 2000 + 700 = 7700
+    expect(backForSale(sale({}), { rate: 20, perVisit: 500 })).toEqual({ byRate: 1540, perVisit: 500, total: 2040 });
+    // 999 + 2000 + 700 = 3699 × 15% = 554.85 → 円未満切り捨て
+    expect(backForSale(sale({ drinkAmount: 999 }), { rate: 15, perVisit: 0 }).byRate).toBe(554);
   });
 
   it("aggregates a month by channel and staff, counting only SNS sales for back by default", () => {
@@ -57,7 +54,7 @@ describe("sales calculations", () => {
       sale({ staffId: null }), // 担当なし
       sale({ businessDate: "2026-11-01" }), // 翌月
     ];
-    const report = monthlyReport("2026-10", sales, [staff("a"), staff("b", { drink: 30, perVisit: 1000 })], {
+    const report = monthlyReport("2026-10", sales, [staff("a"), staff("b", { rate: 30, perVisit: 1000 })], {
       backTarget: "sns",
     });
 
@@ -68,20 +65,20 @@ describe("sales calculations", () => {
 
     const [a, b] = report.staff;
     expect(a.sales.count).toBe(2);
-    expect(a.back.total).toBe(500 + 1000);
-    expect(b.back).toMatchObject({ drink: 900, perVisit: 1000, total: 1900 });
-    expect(report.backTotal).toBe(3400);
+    expect(a.back.total).toBe(770 + 1320);
+    expect(b.back).toMatchObject({ byRate: 990, perVisit: 1000, total: 1990 });
+    expect(report.backTotal).toBe(4080);
   });
 
   it("treats simulator (test) sales as SNS", () => {
     const report = monthlyReport("2026-10", [sale({ channel: "simulator" })], [staff("a")], { backTarget: "sns" });
     expect(report.sns.count).toBe(1);
-    expect(report.staff[0].back.total).toBe(500);
+    expect(report.staff[0].back.total).toBe(770);
   });
 
   it("includes non-SNS sales when the target is all", () => {
     const report = monthlyReport("2026-10", [sale({ channel: "manual" })], [staff("a")], { backTarget: "all" });
-    expect(report.staff[0].back.total).toBe(500);
+    expect(report.staff[0].back.total).toBe(770);
   });
 
   it("hides inactive staff unless they have sales that month", () => {
@@ -96,7 +93,7 @@ describe("sales calculations", () => {
     expect(monthRange("2028-02")).toEqual({ first: "2028-02-01", last: "2028-02-29" });
     const csv = reportCsv(monthlyReport("2026-10", [sale({})], [{ ...staff("a"), name: 'A,"愛"' }], { backTarget: "sns" }));
     expect(csv.startsWith("﻿スタッフ,")).toBe(true);
-    expect(csv).toContain('"A,""愛""",1,2,5000,2000,700,7700,500,0,0,0,500');
+    expect(csv).toContain('"A,""愛""",10,1,2,5000,2000,700,7700,770,0,770');
   });
 
   it("neutralizes spreadsheet formulas from untrusted names", () => {

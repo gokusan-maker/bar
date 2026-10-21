@@ -144,6 +144,8 @@ export async function saveSettingsAction(formData: FormData) {
     lineFriendUrl: /^https:\/\/(lin\.ee|line\.me|page\.line\.me)\//.test(str(formData, "lineFriendUrl"))
       ? str(formData, "lineFriendUrl")
       : "",
+    // 招待リンクはスタッフの画面で作る・止める
+    staffInviteCode: current.staffInviteCode,
   };
   await repo.saveSettings(settings);
   await recordAudit({ actor: "owner", action: "設定を変更", targetType: "settings", targetId: null, detail: null });
