@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bar",
+  // Next.js をそのまま動かす本体（build で生成）に、定期処理を足した入口
+  "main": "worker.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  // UTCで指定。3時=日本の12時（リマインド・古い個人情報の削除）、8時=日本の17時（今夜の予約一覧など）
+  "triggers": {
+    "crons": ["0 3 * * *", "0 8 * * *"]
+  }
+}
