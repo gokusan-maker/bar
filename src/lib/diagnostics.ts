@@ -1,9 +1,9 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
 import { authMode } from "./auth";
 import { appBaseUrl, googleOAuthConfig, instagramClient, lineClient, repository } from "./container";
 import { listCalendars } from "./integrations/google-calendar";
+import { DB_SCHEMA, EVIDENCE_BUCKET, supabaseClient } from "./repo/supabase";
 
 export interface Check {
   name: string;
@@ -69,15 +69,22 @@ export async function runDiagnostics(): Promise<Check[]> {
       const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
       if (!url || !key) return { name: "データベース（Supabase）", status: "warn", detail: "未接続（メモリ保存。再起動でデータが消えます）" };
       if (!env("TOKEN_ENCRYPTION_KEY")) return { name: "データベース（Supabase）", status: "error", detail: "TOKEN_ENCRYPTION_KEY が未設定です" };
-      const db = createClient(url, key, { auth: { persistSession: false } });
+      const db = supabaseClient(url, key);
       const missing: string[] = [];
       for (const [table, file] of TABLES) {
         const { error } = await db.from(table).select("*", { count: "exact", head: true });
+        // bar スキーマがAPIに公開されていないと、どの表も読めない
+        if (error?.code === "PGRST106") {
+          return { name: "データベース（Supabase）", status: "error", detail: `Supabaseの Project Settings → Data API → Exposed schemas に「${DB_SCHEMA}」を追加してください` };
+        }
+        if (error?.code === "42501") {
+          return { name: "データベース（Supabase）", status: "error", detail: "表を読む権限がありません。20261026000000_grants.sql を実行してください" };
+        }
         if (error) missing.push(file);
       }
-      const bucket = await db.storage.getBucket("evidence");
+      const bucket = await db.storage.getBucket(EVIDENCE_BUCKET);
       if (missing.length) return { name: "データベース（Supabase）", status: "error", detail: `未実行のSQLがあります: ${missing.join("、")}` };
-      if (bucket.error) return { name: "データベース（Supabase）", status: "error", detail: "証拠写真の保存先（evidence バケット）がありません" };
+      if (bucket.error) return { name: "データベース（Supabase）", status: "error", detail: `証拠写真の保存先（${EVIDENCE_BUCKET} バケット）がありません` };
       return { name: "データベース（Supabase）", status: "ok", detail: "接続OK・テーブルと写真の保存先あり" };
     }),
   );

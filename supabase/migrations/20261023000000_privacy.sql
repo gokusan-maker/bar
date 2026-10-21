@@ -1,5 +1,7 @@
 -- ログイン失敗の記録（総当たり対策）と、個人情報の自動削除
 
+set search_path = bar, public;
+
 create table if not exists login_failures (
   id bigint generated always as identity primary key,
   ip text not null,
@@ -14,6 +16,7 @@ alter table login_failures enable row level security;
 create or replace function purge_personal_data(cutoff timestamptz)
 returns json
 language plpgsql
+set search_path = bar
 as $$
 declare
   n_messages int;

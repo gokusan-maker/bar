@@ -1,5 +1,10 @@
 -- バー予約アプリ 初期スキーマ
 -- サーバー（service_role キー）からのみアクセスする。RLSを有効にしてポリシーは作らない。
+-- 1つのSupabaseプロジェクトに複数のアプリを同居させるため、表はすべて bar スキーマに置く。
+
+create schema if not exists bar;
+
+set search_path = bar, public;
 
 create table if not exists shop_settings (
   id smallint primary key default 1 check (id = 1),

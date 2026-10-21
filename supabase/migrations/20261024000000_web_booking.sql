@@ -1,5 +1,7 @@
 -- 予約フォーム（web）からの受付
 
+set search_path = bar, public;
+
 alter table customers drop constraint if exists customers_channel_check;
 alter table customers add constraint customers_channel_check
   check (channel in ('line', 'instagram', 'web', 'simulator', 'manual'));
@@ -21,6 +23,7 @@ alter table web_requests enable row level security;
 create or replace function purge_personal_data(cutoff timestamptz)
 returns json
 language plpgsql
+set search_path = bar
 as $$
 declare
   n_messages int;

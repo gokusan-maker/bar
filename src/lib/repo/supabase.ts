@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { decrypt, encrypt } from "../crypto";
 import { randomUUID } from "node:crypto";
 import {
@@ -27,7 +27,14 @@ import type {
   SaleQuery,
 } from "./types";
 
-const BUCKET = "evidence";
+/** 1つのSupabaseプロジェクトに他のアプリと同居させるため、表は bar スキーマ、写真は bar-evidence バケットに置く */
+export const DB_SCHEMA = "bar";
+export const EVIDENCE_BUCKET = "bar-evidence";
+const BUCKET = EVIDENCE_BUCKET;
+
+export function supabaseClient(url: string, serviceRoleKey: string) {
+  return createClient(url, serviceRoleKey, { db: { schema: DB_SCHEMA }, auth: { persistSession: false } });
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- 生成型を使わないためDB行は any で受けて変換する */
 
@@ -147,14 +154,14 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 }
 
 export class SupabaseRepository implements Repository {
-  private db: SupabaseClient;
+  private db: ReturnType<typeof supabaseClient>;
 
   constructor(
     url: string,
     serviceRoleKey: string,
     private readonly encryptionKey: string,
   ) {
-    this.db = createClient(url, serviceRoleKey, { auth: { persistSession: false } });
+    this.db = supabaseClient(url, serviceRoleKey);
   }
 
   async getSettings(): Promise<ShopSettings> {
