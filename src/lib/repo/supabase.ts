@@ -53,7 +53,11 @@ const toCustomer = (r: any): Customer => ({
 const toStaff = (r: any): Staff => ({
   id: r.id,
   name: r.name,
-  backRates: { drink: 0, charge: 0, service: 0, perVisit: 0, ...r.back_rates },
+  backRates: {
+    // 以前の項目別の率（お酒・料金・サービス料）で保存されたものは、お酒の率を全体の率として引き継ぐ
+    rate: Number(r.back_rates?.rate ?? r.back_rates?.drink ?? 0),
+    perVisit: Number(r.back_rates?.perVisit ?? 0),
+  },
   active: r.active,
   passwordHash: r.password_hash ?? null,
   pending: r.pending ?? false,

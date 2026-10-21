@@ -60,7 +60,7 @@ export async function registerStaff(
     ? await repo.updateStaff(existing.id, { passwordHash, pending: true })
     : await repo.createStaff({
         name,
-        backRates: { drink: 0, charge: 0, service: 0, perVisit: 0 },
+        backRates: { rate: 0, perVisit: 0 },
         active: true,
         passwordHash,
         pending: true,

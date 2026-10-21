@@ -116,16 +116,14 @@ export async function saveStaffAction(formData: FormData) {
   const name = str(formData, "name");
   const pct = (k: string) => Number(str(formData, k).normalize("NFKC") || "0");
   const backRates = {
-    drink: pct("drink"),
-    charge: pct("charge"),
-    service: pct("service"),
+    rate: pct("rate"),
     perVisit: yenField(formData, "perVisit"),
   };
   if (!name) go("/admin/staff", { error: "名前を入力してください" });
   const invalid = validateBackRates(backRates);
   if (invalid) go("/admin/staff", { error: invalid });
   const repo = repository();
-  const rates = `お酒${backRates.drink}% 料金${backRates.charge}% サービス料${backRates.service}% 固定${backRates.perVisit}円`;
+  const rates = `売上全体の${backRates.rate}% 固定${backRates.perVisit}円`;
   // 店主がログイン用パスワードを決める場合（空なら変えない）
   const password = String(formData.get("password") ?? "");
   const disableLogin = formData.get("disableLogin") === "on";

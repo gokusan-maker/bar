@@ -34,20 +34,12 @@ function LoginFields({ s }: { s?: Staff }) {
 }
 
 function RateFields({ s }: { s?: Staff }) {
-  const r = s?.backRates ?? { drink: 0, charge: 0, service: 0, perVisit: 0 };
+  const r = s?.backRates ?? { rate: 0, perVisit: 0 };
   return (
     <div className="grid2">
       <label>
-        お酒バック（%）
-        <input name="drink" inputMode="decimal" defaultValue={r.drink} />
-      </label>
-      <label>
-        料金バック（%）
-        <input name="charge" inputMode="decimal" defaultValue={r.charge} />
-      </label>
-      <label>
-        サービス料バック（%）
-        <input name="service" inputMode="decimal" defaultValue={r.service} />
+        バック率（%・サービス料を含む売上全体に対して）
+        <input name="rate" inputMode="decimal" defaultValue={r.rate} />
       </label>
       <label>
         1組ごとの固定バック（円）
@@ -74,7 +66,7 @@ export default async function StaffPage({
     <>
       <h1>スタッフとバック率</h1>
       <p className="muted">
-        お客様の担当スタッフに、売上の項目ごとの割合と1組ごとの固定額でバックを計算します。担当はお客様の画面か、売上の入力時に選びます。
+        お客様の担当スタッフに、売上全体（お酒＋料金＋サービス料）× バック率 ＋ 1組ごとの固定額でバックを計算します。担当はお客様の画面か、売上の入力時に選びます。
       </p>
       {saved && <p className="notice success">{SAVED[saved] ?? SAVED["1"]}</p>}
       {error && <p className="notice error">{error}</p>}

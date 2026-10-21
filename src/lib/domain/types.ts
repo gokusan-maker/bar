@@ -188,11 +188,9 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   staffInviteCode: "",
 };
 
-/** バック率（%）と1組あたりの固定バック（円） */
+/** 売上全体（お酒＋料金＋サービス料）に対するバック率（%）と、1組あたりの固定バック（円） */
 export interface BackRates {
-  drink: number;
-  charge: number;
-  service: number;
+  rate: number;
   perVisit: number;
 }
 

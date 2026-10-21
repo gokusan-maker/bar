@@ -47,10 +47,10 @@ describe("staff self-registration", () => {
   });
 
   it("attaches the login to a staff the owner already added, keeping back rates", async () => {
-    const existing = await repo.createStaff({ name: "ＹＵＫＩ", active: true, backRates: { drink: 10, charge: 0, service: 0, perVisit: 0 } });
+    const existing = await repo.createStaff({ name: "ＹＵＫＩ", active: true, backRates: { rate: 10, perVisit: 0 } });
     const r = await register("yuki");
     expect(r.ok && r.staff.id).toBe(existing.id);
-    expect((await repo.getStaff(existing.id))?.backRates.drink).toBe(10);
+    expect((await repo.getStaff(existing.id))?.backRates.rate).toBe(10);
     expect(await repo.listStaff()).toHaveLength(1);
   });
 
