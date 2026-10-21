@@ -43,7 +43,3 @@ next-env.d.ts
 
 !.env.example
 
-# cloudflare
-/.open-next
-/.wrangler
-.dev.vars

@@ -193,10 +193,10 @@
 
 ## 7. システム構成（案）
 
-**Next.js（TypeScript）** をベースにし、Cloudflare Workers（OpenNext）で動かす構成（2026-10-21 に Vercel から変更。無料プランで商用利用できるため）。
+既存リポジトリと同じ **Next.js（TypeScript）** をベースにし、Vercelにデプロイする構成を想定。
 
 ```
-[LINE / Instagram]  --Webhook-->  [Next.js API Routes (Cloudflare Workers)]
+[LINE / Instagram]  --Webhook-->  [Next.js API Routes (Vercel)]
                                         │
                                         ├─ メッセージ解析（Claude API）
                                         ├─ 予約ロジック・空き判定
@@ -208,11 +208,11 @@
 
 | 項目 | 候補 |
 |---|---|
-| フロント / API | Next.js（App Router）、Cloudflare Workers |
+| フロント / API | Next.js（App Router）、Vercel |
 | DB・認証 | Supabase（PostgreSQL＋Auth） |
 | 予約情報の抽出 | Claude API（構造化出力で日時・人数等をJSON化） |
 | カレンダー | Google Calendar API（OAuth 2.0、Push通知） |
-| 定期処理（リマインド・同期の再試行） | Cloudflare Workers の Cron Triggers |
+| 定期処理（リマインド・同期の再試行） | Vercel Cron |
 
 ### 7.1 主要データ（概要）
 | テーブル | 主な項目 |
@@ -268,7 +268,7 @@
 
 要件との差分:
 - 管理画面のログインはGoogleアカウントではなくパスワード方式（F-ADM-01）。店主用とスタッフ用（閲覧・来店チェックのみ）の2種類。
-- カレンダー側での予定の移動・削除の反映（F-CAL-05）は、Push通知ではなく毎日17時の取り込み＋手動ボタンで実装（当初の想定環境の制約による。Cloudflare ではより短い間隔にもできる）。
+- カレンダー側での予定の移動・削除の反映（F-CAL-05）は、Push通知ではなく毎日17時の取り込み＋手動ボタンで実装（Vercelの無料プランではcronが1日1回のため）。
 - 空き判定は席の割り当てではなく、同時人数の上限で行う。
 - 集計（F-ADM-09）・操作履歴・個人情報の自動削除（初期値24か月、売上金額と証拠は帳簿として保存）は実装済み。
 

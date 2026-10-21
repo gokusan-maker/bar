@@ -62,16 +62,10 @@ http://localhost:3000/admin/simulator を開き、「土曜の9時から2名で�
 3. Project Settings → API の URL と `service_role` キーを `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` に設定
 4. `TOKEN_ENCRYPTION_KEY` に長いランダム文字列を設定（例: `openssl rand -base64 32`）
 
-### 2. Cloudflare Workers にデプロイ（無料プランで商用利用可）
-1. https://dash.cloudflare.com で無料アカウントを作る
-2. **Workers & Pages → Create → Import a repository** で `gokusan-maker/bar` を選ぶ
-   - Build command: `npx opennextjs-cloudflare build`
-   - Deploy command: `npx opennextjs-cloudflare deploy`
-3. 作成されたWorkerの **Settings → Variables and Secrets** に、[`.env.example`](.env.example) を見ながら値を入れる（パスワードやキーは「Secret」で）。`APP_BASE_URL` は `https://bar.<あなたのサブドメイン>.workers.dev`
-4. もう一度デプロイ（Deployments → Retry、または GitHub に push）
-5. 定期処理（毎日12時のリマインド、17時の予約一覧の通知など）は [`wrangler.jsonc`](wrangler.jsonc) の `triggers.crons` で自動登録される。`CRON_SECRET` の設定が必要
-
-手元で Cloudflare と同じ環境を試す: `.dev.vars` に環境変数を書いて `npm run preview`
+### 2. Vercel にデプロイ
+1. Vercel でこのリポジトリをインポートする（設定はそのままでよい）
+2. 環境変数を [`.env.example`](.env.example) を見ながら設定（`APP_BASE_URL` は Vercel のURL）
+3. `CRON_SECRET` を設定すると、毎日12時（日本時間）にリマインドが動く（[`vercel.json`](vercel.json)）
 
 ### 3. Claude API（メッセージの読み取り・任意）
 **設定しなくても無料で動きます。** APIキーがない場合は、アプリに組み込んだ簡易読み取り（日付・時間・人数・名前、「週末」「夜9時」「1人増えます」「遅れます」などの書き方に対応）を使い、AIの料金はかかりません。より自由な書き方にも対応したい場合だけ、APIキーを設定してください（利用量に応じて料金が発生）。
