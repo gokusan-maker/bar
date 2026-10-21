@@ -38,7 +38,8 @@ export default async function NewSalePage({
       reservationId: null,
       customerId: null,
       staffId: null,
-      channel: "manual",
+      // いちばん多い経路を最初から選んでおく
+      channel: "line",
       customerName: null,
       partySize: 1,
       drinkAmount: 0,
