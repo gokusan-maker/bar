@@ -14,6 +14,7 @@ import type {
   Reservation,
   ReservationStatus,
   Sale,
+  ShopSecrets,
   ShopSettings,
   Staff,
 } from "../domain/types";
@@ -61,8 +62,8 @@ export interface ReservationQuery {
  * 永続化の抽象。開発・テスト用のメモリ実装と、本番用のSupabase実装がある。
  */
 /** ログイン関係は省略するとログインなし */
-export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending" | "lineUserId" | "loginId"> &
-  Partial<Pick<Staff, "passwordHash" | "pending" | "lineUserId" | "loginId">>;
+export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending" | "lineUserId" | "loginId" | "role"> &
+  Partial<Pick<Staff, "passwordHash" | "pending" | "lineUserId" | "loginId" | "role">>;
 
 export type CustomerPatch = Partial<
   Pick<Customer, "name" | "note" | "displayName" | "staffId" | "phone" | "birthday" | "tags" | "birthdayGreetedYear">
@@ -113,7 +114,10 @@ export interface Repository {
   /** 開始時刻の昇順 */
   listReservations(query: ReservationQuery): Promise<Reservation[]>;
 
+  /** スタッフ（オーナーは含まない） */
   listStaff(): Promise<Staff[]>;
+  /** この店舗のオーナー */
+  listOwners(): Promise<Staff[]>;
   getStaff(id: string): Promise<Staff | null>;
   createStaff(input: NewStaff): Promise<Staff>;
   updateStaff(id: string, patch: Partial<Omit<Staff, "id" | "createdAt">>): Promise<Staff>;
@@ -160,6 +164,10 @@ export interface Repository {
   /** 集客投稿の画像（Instagramが読みに来るので公開URLで配る） */
   savePromoImage(key: string, data: Uint8Array, contentType: string): Promise<void>;
   getPromoImage(key: string): Promise<{ data: Uint8Array; contentType: string } | null>;
+
+  /** LINE・Instagram の接続情報（この店舗の） */
+  getSecrets(): Promise<ShopSecrets>;
+  saveSecrets(secrets: ShopSecrets): Promise<void>;
 
   addAudit(entry: Omit<AuditLog, "id" | "createdAt">): Promise<void>;
   /** 新しい順 */

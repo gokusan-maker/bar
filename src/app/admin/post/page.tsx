@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
-import { appBaseUrl, instagramClient, lineClient, repository, reservationService } from "@/lib/container";
+import { instagramClient, lineClient, repository, currentShopId, reservationService, shopPublicUrl } from "@/lib/container";
 import { availabilityPost, seatMark } from "@/lib/domain/post";
 import { addDays, isValidDate, toJst, weekdayJa } from "@/lib/domain/time";
 import { CopyButton } from "../copy-button";
@@ -9,7 +9,7 @@ import { PromoImageInput } from "./promo-image-input";
 
 /** LINEの今月の送信通数（取得できなければ null） */
 async function lineQuota() {
-  const line = lineClient();
+  const line = await lineClient();
   if (!line) return null;
   try {
     return await line.quota();
@@ -35,9 +35,8 @@ export default async function PostPage({
     reservationService().availabilityBoard(date),
     lineQuota(),
   ]);
-  const lineReady = !!lineClient();
-  const instagramReady = !!instagramClient();
-  const base = appBaseUrl();
+  const [lineReady, instagramReady] = await Promise.all([lineClient().then(Boolean), instagramClient().then(Boolean)]);
+  const base = await shopPublicUrl();
   const text = availabilityPost(settings, date, slots, {
     isToday: date === today,
     // X向けはX用リンクにして、予約をXとして集計する
@@ -115,7 +114,7 @@ export default async function PostPage({
           <form action={uploadPromoImageAction} style={{ marginTop: 16 }}>
             {settings.promoImageKey && (
               // eslint-disable-next-line @next/next/no-img-element -- 店主がアップロードした画像をそのまま表示する
-              <img src={`/promo-image/${settings.promoImageKey}`} alt="Instagram投稿用の画像" style={{ maxWidth: 200, borderRadius: 8 }} />
+              <img src={`/promo-image/${await currentShopId()}/${settings.promoImageKey}`} alt="Instagram投稿用の画像" style={{ maxWidth: 200, borderRadius: 8 }} />
             )}
             <PromoImageInput />
             <button type="submit">{settings.promoImageKey ? "画像を変える" : "画像を保存"}</button>

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword } from "./password";
+import { MemoryDirectory } from "./directory";
 import { MemoryRepository } from "./repo/memory";
 import { authenticateStaff, canLogin, linkStaffLine, MAX_PENDING, newInviteCode, registerStaff, registerStaffWithLine } from "./staff-accounts";
 
@@ -25,7 +26,7 @@ describe("staff self-registration", () => {
 
   let n = 0;
   const register = (name: string, password = "password1", c = code, loginId = `staff${++n}`) =>
-    registerStaff(repo, { code: c, name, password, loginId });
+    registerStaff(repo, new MemoryDirectory(repo), { code: c, name, password, loginId });
 
   it("rejects a wrong or disabled invite code", async () => {
     expect((await register("ゆか", "password1", "wrong")).ok).toBe(false);
@@ -76,17 +77,17 @@ describe("staff LINE login", () => {
   });
 
   it("registers with LINE as pending, and cannot register the same LINE twice", async () => {
-    const r = await registerStaffWithLine(repo, { code, lineUserId: "U1", name: "ゆか", ownerLineUserIds: [] });
+    const r = await registerStaffWithLine(repo, new MemoryDirectory(repo), { code, lineUserId: "U1", name: "ゆか", ownerLineUserIds: [] });
     expect(r).toMatchObject({ ok: true, staff: { name: "ゆか", lineUserId: "U1", pending: true } });
     if (r.ok) expect(canLogin(r.staff)).toBe(false);
-    expect(await registerStaffWithLine(repo, { code, lineUserId: "U1", name: "ゆか", ownerLineUserIds: [] })).toMatchObject({ ok: false });
-    expect(await registerStaffWithLine(repo, { code: "bad", lineUserId: "U2", name: "x", ownerLineUserIds: [] })).toMatchObject({ ok: false });
-    expect(await registerStaffWithLine(repo, { code, lineUserId: "OWNER", name: "x", ownerLineUserIds: ["OWNER"] })).toMatchObject({ ok: false });
+    expect(await registerStaffWithLine(repo, new MemoryDirectory(repo), { code, lineUserId: "U1", name: "ゆか", ownerLineUserIds: [] })).toMatchObject({ ok: false });
+    expect(await registerStaffWithLine(repo, new MemoryDirectory(repo), { code: "bad", lineUserId: "U2", name: "x", ownerLineUserIds: [] })).toMatchObject({ ok: false });
+    expect(await registerStaffWithLine(repo, new MemoryDirectory(repo), { code, lineUserId: "OWNER", name: "x", ownerLineUserIds: ["OWNER"] })).toMatchObject({ ok: false });
   });
 
   it("attaches LINE to a staff the owner already added, and approved LINE staff can log in", async () => {
     const existing = await repo.createStaff({ name: "みき", active: true, backRates: { rate: 20, perVisit: 0 } });
-    const r = await registerStaffWithLine(repo, { code, lineUserId: "U3", name: "みき", ownerLineUserIds: [] });
+    const r = await registerStaffWithLine(repo, new MemoryDirectory(repo), { code, lineUserId: "U3", name: "みき", ownerLineUserIds: [] });
     expect(r.ok && r.staff.id).toBe(existing.id);
     await repo.updateStaff(existing.id, { pending: false });
     const s = await repo.getStaff(existing.id);
@@ -97,9 +98,9 @@ describe("staff LINE login", () => {
   it("links LINE to a logged-in staff unless another account uses it", async () => {
     const a = await repo.createStaff({ name: "a", active: true, backRates: { rate: 0, perVisit: 0 } });
     const b = await repo.createStaff({ name: "b", active: true, backRates: { rate: 0, perVisit: 0 } });
-    expect(await linkStaffLine(repo, a.id, "U9", [])).toBeNull();
-    expect(await linkStaffLine(repo, b.id, "U9", [])).toContain("ほかのスタッフ");
-    expect(await linkStaffLine(repo, b.id, "OWN", ["OWN"])).toContain("店主");
+    expect(await linkStaffLine(repo, new MemoryDirectory(repo), a.id, "U9", [])).toBeNull();
+    expect(await linkStaffLine(repo, new MemoryDirectory(repo), b.id, "U9", [])).toContain("ほかのアカウント");
+    expect(await linkStaffLine(repo, new MemoryDirectory(repo), b.id, "OWN", ["OWN"])).toContain("店主");
   });
 
   it("checks passwords against the right person when a LINE-only staff has the same name", async () => {
@@ -114,7 +115,7 @@ describe("login IDs", () => {
     const repo = new MemoryRepository();
     const code = newInviteCode();
     await repo.saveSettings({ ...(await repo.getSettings()), staffInviteCode: code });
-    const r = await registerStaff(repo, { code, name: "ゆか", password: "password1", loginId: "Yuka_01" });
+    const r = await registerStaff(repo, new MemoryDirectory(repo), { code, name: "ゆか", password: "password1", loginId: "Yuka_01" });
     expect(r).toMatchObject({ ok: true, staff: { loginId: "yuka_01" } });
     if (!r.ok) return;
     await repo.updateStaff(r.staff.id, { pending: false });
@@ -122,8 +123,8 @@ describe("login IDs", () => {
     expect((await authenticateStaff(repo, "ゆか", "password1"))?.id).toBe(r.staff.id);
     expect(await authenticateStaff(repo, "yuka_01", "wrong-pass")).toBeNull();
     // 同じID・オーナーのID・使えない文字は登録できない
-    expect(await registerStaff(repo, { code, name: "みき", password: "password1", loginId: "yuka_01" })).toMatchObject({ ok: false });
-    expect(await registerStaff(repo, { code, name: "みき", password: "password1", loginId: "admin" })).toMatchObject({ ok: false });
-    expect(await registerStaff(repo, { code, name: "みき", password: "password1", loginId: "み" })).toMatchObject({ ok: false });
+    expect(await registerStaff(repo, new MemoryDirectory(repo), { code, name: "みき", password: "password1", loginId: "yuka_01" })).toMatchObject({ ok: false });
+    expect(await registerStaff(repo, new MemoryDirectory(repo), { code, name: "みき", password: "password1", loginId: "admin" }, ["admin"])).toMatchObject({ ok: false });
+    expect(await registerStaff(repo, new MemoryDirectory(repo), { code, name: "みき", password: "password1", loginId: "み" })).toMatchObject({ ok: false });
   });
 });

@@ -47,6 +47,8 @@ describe("PromoService", () => {
       instagram: withInstagram ? { publishPhoto: async (url, caption) => (published.push({ url, caption }), "m1") } : null,
       notify: async (t) => void notices.push(t),
       baseUrl: "https://bar.example",
+      shopUrl: "https://bar.example/s/test",
+      shopId: "shop-1",
       now: () => now,
     });
 
@@ -121,7 +123,7 @@ describe("PromoService", () => {
     line.fail = true;
     const r = await promo(true).sendNow();
     expect(r).toMatchObject({ sent: true, line: false, instagram: true });
-    expect(published[0].url).toBe("https://bar.example/promo-image/abc");
+    expect(published[0].url).toBe("https://bar.example/promo-image/shop-1/abc");
     expect(published[0].caption).toContain("https://lin.ee/x");
     expect(notices[0]).toContain("LINEの配信に失敗しました");
   });

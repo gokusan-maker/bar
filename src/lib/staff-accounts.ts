@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { Staff } from "./domain/types";
 import { hashPassword, verifyPassword } from "./password";
+import type { ShopDirectory } from "./directory";
 import type { Repository } from "./repo/types";
 
 export const MIN_PASSWORD_LENGTH = 8;
@@ -21,10 +22,14 @@ export function loginIdProblem(id: string): string | null {
   return null;
 }
 
-/** ほかのスタッフ・オーナーが使っていないか */
-export async function loginIdTaken(repo: Repository, id: string, exceptStaffId?: string): Promise<boolean> {
-  if (normalizeLoginId((await repo.getSettings()).ownerLoginId) === id) return true;
-  return (await repo.listStaff()).some((s) => s.loginId === id && s.id !== exceptStaffId);
+/** ログインID・LINEは全店舗で重複させないので、店舗をまたいで探す */
+export type MemberLookup = Pick<ShopDirectory, "findMemberByLoginId" | "findMemberByLineUserId">;
+
+/** ほかの人（どの店舗のスタッフ・オーナーも）が使っていないか。reserved は店舗1の旧オーナーIDなど */
+export async function loginIdTaken(lookup: MemberLookup, id: string, exceptMemberId?: string, reserved: string[] = []): Promise<boolean> {
+  if (reserved.map(normalizeLoginId).includes(id)) return true;
+  const found = await lookup.findMemberByLoginId(id);
+  return !!found && found.member.id !== exceptMemberId;
 }
 
 function sameCode(input: string, expected: string): boolean {
@@ -51,7 +56,9 @@ export type RegisterResult = { ok: true; staff: Staff } | { ok: false; error: st
  */
 export async function registerStaff(
   repo: Repository,
+  lookup: MemberLookup,
   input: { code: string; name: string; password: string; loginId: string },
+  reserved: string[] = [],
 ): Promise<RegisterResult> {
   if (!(await isValidInviteCode(repo, input.code))) {
     return { ok: false, error: "このリンクは使えません。店主に新しいリンクをもらってください" };
@@ -63,7 +70,7 @@ export async function registerStaff(
   const loginId = normalizeLoginId(input.loginId);
   const idProblem = loginIdProblem(loginId);
   if (idProblem) return { ok: false, error: idProblem };
-  if (await loginIdTaken(repo, loginId)) return { ok: false, error: "このログインIDはすでに使われています。別のIDにしてください" };
+  if (await loginIdTaken(lookup, loginId, undefined, reserved)) return { ok: false, error: "このログインIDはすでに使われています。別のIDにしてください" };
 
   const staff = await repo.listStaff();
   if (staff.filter((s) => s.pending).length >= MAX_PENDING) {
@@ -112,6 +119,7 @@ export const canLogin = (s: Staff) => s.active && !s.pending && !!(s.passwordHas
  */
 export async function registerStaffWithLine(
   repo: Repository,
+  lookup: MemberLookup,
   input: { code: string; lineUserId: string; name: string; ownerLineUserIds: string[] },
 ): Promise<RegisterResult> {
   if (!(await isValidInviteCode(repo, input.code))) {
@@ -119,9 +127,14 @@ export async function registerStaffWithLine(
   }
   if (input.ownerLineUserIds.includes(input.lineUserId)) return { ok: false, error: "このLINEは店主として登録されています" };
   const staff = await repo.listStaff();
-  const mine = staff.find((s) => s.lineUserId === input.lineUserId);
+  const mine = await lookup.findMemberByLineUserId(input.lineUserId);
   if (mine) {
-    return { ok: false, error: mine.pending ? "登録の申請は受け付け済みです。店主の承認をお待ちください" : "このLINEはすでに登録されています。ログイン画面からLINEでログインしてください" };
+    return {
+      ok: false,
+      error: mine.member.pending
+        ? "登録の申請は受け付け済みです。店主の承認をお待ちください"
+        : "このLINEはすでに登録されています。ログイン画面からLINEでログインしてください",
+    };
   }
   if (staff.filter((s) => s.pending).length >= MAX_PENDING) {
     return { ok: false, error: "承認待ちの申請が多いため受け付けられません。店主に連絡してください" };
@@ -138,13 +151,14 @@ export async function registerStaffWithLine(
 /** ログイン中のスタッフが、自分のアカウントにLINEを連携する */
 export async function linkStaffLine(
   repo: Repository,
+  lookup: MemberLookup,
   staffId: string,
   lineUserId: string,
   ownerLineUserIds: string[],
 ): Promise<string | null> {
   if (ownerLineUserIds.includes(lineUserId)) return "このLINEは店主として登録されています";
-  const other = (await repo.listStaff()).find((s) => s.lineUserId === lineUserId && s.id !== staffId);
-  if (other) return "このLINEはほかのスタッフに連携されています";
+  const other = await lookup.findMemberByLineUserId(lineUserId);
+  if (other && other.member.id !== staffId) return "このLINEはほかのアカウントに連携されています";
   await repo.updateStaff(staffId, { lineUserId });
   return null;
 }

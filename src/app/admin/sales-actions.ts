@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { currentActor, requireAdmin, requireStaff } from "@/lib/auth";
+import { currentActor, requireAdmin, requireStaff, reservedLoginIds } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
-import { repository, salesService } from "@/lib/container";
+import { directory, repository, salesService } from "@/lib/container";
 import { saleTotal } from "@/lib/domain/sales";
 import type { AuditLog, Channel } from "@/lib/domain/types";
 import { validateBackRates, type SaleInput } from "@/lib/sales-service";
@@ -149,7 +149,7 @@ export async function saveStaffAction(formData: FormData) {
   if (loginIdInput) {
     const problem = loginIdProblem(loginIdInput);
     if (problem) go("/admin/staff", { error: problem });
-    if (await loginIdTaken(repo, loginIdInput, id || undefined)) go("/admin/staff", { error: `ログインID「${loginIdInput}」はすでに使われています` });
+    if (await loginIdTaken(directory(), loginIdInput, id || undefined, await reservedLoginIds())) go("/admin/staff", { error: `ログインID「${loginIdInput}」はすでに使われています` });
   }
   const loginId = loginIdInput || null;
   const login = disableLogin

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { authMode, currentSession, requireStaff } from "@/lib/auth";
-import { googleOAuthConfig, isMemoryMode } from "@/lib/container";
+import { googleOAuthConfig, isMemoryMode, repository } from "@/lib/container";
 import { logoutAction } from "./actions";
 import { TabBar } from "./tabbar";
 
@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const role = await requireStaff();
   const owner = role === "owner";
-  const staffName = owner ? null : (await currentSession())?.staffName;
+  const session = await currentSession();
+  const staffName = owner ? null : session?.staffName;
+  const shopName = (await repository().getSettings()).shopName;
   const warnings = !owner ? [] : [
     isMemoryMode() && "データベース未接続のため、データはメモリに保存されています（再起動で消えます）。",
     authMode() === "open-dev" && "ADMIN_PASSWORD 未設定のため、ログインなしで表示しています（開発モード）。",
@@ -20,7 +22,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <>
       <nav className="nav">
         <div className="nav-inner">
-          <strong>{owner ? "オーナー管理画面" : `スタッフ画面（${staffName ?? "スタッフ"}）`}</strong>
+          <strong>
+            {shopName}　{owner ? "オーナー" : `スタッフ（${staffName ?? "スタッフ"}）`}
+          </strong>
           <Link href="/admin">予約一覧</Link>
           <Link href="/admin/orders">注文</Link>
           {!owner && (
@@ -45,6 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link href="/admin/staff">スタッフ</Link>
               <Link href="/admin/history">履歴</Link>
               <Link href="/admin/settings">設定</Link>
+              {session?.memberId && <Link href="/admin/account">アカウント</Link>}
             </>
           )}
           {authMode() === "password" && (

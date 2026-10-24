@@ -21,6 +21,9 @@ export interface PromoDeps {
   instagram: PromoInstagram | null;
   notify(text: string): Promise<void>;
   baseUrl: string | null;
+  /** この店舗の公開URLの土台（https://…/s/<店舗>）。予約フォームのリンクに使う */
+  shopUrl: string | null;
+  shopId: string;
   now?: () => Date;
 }
 
@@ -48,8 +51,8 @@ export function bookingButtons(businessDate: string, slots: SlotAvailability[]) 
 }
 
 /** 配信する文面（LINE用・Instagram用） */
-export function promoTexts(settings: ShopSettings, businessDate: string, slots: SlotAvailability[], baseUrl: string | null) {
-  const reserveUrl = settings.webBookingEnabled && baseUrl ? `${baseUrl}/reserve` : null;
+export function promoTexts(settings: ShopSettings, businessDate: string, slots: SlotAvailability[], shopUrl: string | null) {
+  const reserveUrl = settings.webBookingEnabled && shopUrl ? `${shopUrl}/reserve` : null;
   const head = settings.promoMessage.trim();
   // LINEの友だちにはLINEの案内は不要。ボタンで予約できることを伝える
   const lineBody = availabilityPost(settings, businessDate, slots, { isToday: true, reserveUrl: null, lineUrl: null })
@@ -103,7 +106,7 @@ export class PromoService {
       return this.skip(scheduled, "LINE（またはInstagram）が未接続のため配信できません");
     }
 
-    const texts = promoTexts(settings, date, slots, this.deps.baseUrl);
+    const texts = promoTexts(settings, date, slots, this.deps.shopUrl);
     const failures: string[] = [];
     let lineSent = false;
     let igSent = false;
@@ -129,7 +132,7 @@ export class PromoService {
         failures.push("Instagramに投稿する画像（またはAPP_BASE_URL）が未設定です");
       } else {
         try {
-          await instagram.publishPhoto(`${this.deps.baseUrl}/promo-image/${settings.promoImageKey}`, texts.instagram);
+          await instagram.publishPhoto(`${this.deps.baseUrl}/promo-image/${this.deps.shopId}/${settings.promoImageKey}`, texts.instagram);
           igSent = true;
         } catch (error) {
           failures.push(`Instagramの投稿に失敗しました: ${(error as Error).message.slice(0, 120)}`);

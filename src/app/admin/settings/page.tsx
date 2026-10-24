@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
-import { appBaseUrl, googleOAuthConfig, lineLoginConfig, repository } from "@/lib/container";
+import { currentSession } from "@/lib/auth";
+import { appBaseUrl, currentShopId, directory, googleOAuthConfig, lineLoginConfig, repository, shopPublicUrl } from "@/lib/container";
 import { LineLoginButton } from "../../login/line-button";
 import { weekdayJa } from "@/lib/domain/time";
 import { THEMES } from "@/lib/domain/theme";
@@ -10,8 +11,26 @@ import {
   saveCalendarAction,
   saveOwnerLoginIdAction,
   saveSettingsAction,
+  saveShopSlugAction,
+  saveSnsConnectionsAction,
   unlinkOwnerLineAction,
 } from "../actions";
+
+/** 秘密の値の入力欄（今の値は表示しない） */
+function SecretField({ name, label, saved }: { name: string; label: string; saved: boolean }) {
+  return (
+    <label>
+      {label}
+      {saved ? "（設定済み）" : "（未設定）"}
+      <input name={name} type="password" autoComplete="off" placeholder={saved ? "変えるときだけ入力" : ""} />
+      {saved && (
+        <span className="muted">
+          <input type="checkbox" name={`${name}Clear`} /> 消す
+        </span>
+      )}
+    </label>
+  );
+}
 
 const SHOP_TYPES = ["バー", "ダーツバー", "スナック", "ガールズバー", "コンセプトカフェ", "ラウンジ", "居酒屋", "カラオケバー"];
 const EMPTY_AREAS = Array.from({ length: 3 }, () => ({ name: "", seats: 0 }));
@@ -25,10 +44,10 @@ const GOOGLE_MESSAGES: Record<string, { text: string; className: string }> = {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; google?: string; error?: string; pulled?: string; line?: string }>;
+  searchParams: Promise<{ saved?: string; google?: string; error?: string; pulled?: string; line?: string; welcome?: string }>;
 }) {
   await requireAdmin();
-  const { saved, google, error, pulled, line } = await searchParams;
+  const { saved, google, error, pulled, line, welcome } = await searchParams;
   const [moved, deleted, failed] = (pulled ?? "").split("-").map(Number);
   const repo = repository();
   const [s, integration] = await Promise.all([repo.getSettings(), repo.getGoogleIntegration()]);
@@ -44,7 +63,10 @@ export default async function SettingsPage({
       calendarError = true;
     }
   }
-  const base = appBaseUrl() ?? "https://<あなたのドメイン>";
+  const appBase = appBaseUrl() ?? "https://<あなたのドメイン>";
+  const [session, shopId] = await Promise.all([currentSession(), currentShopId()]);
+  const [shop, secrets, shopBase] = await Promise.all([directory().getShop(shopId), repo.getSecrets(), shopPublicUrl()]);
+  const shopUrl = shopBase ?? `${appBase}/s/<URL名>`;
 
   return (
     <>
@@ -54,12 +76,28 @@ export default async function SettingsPage({
           セットアップ診断
         </a>
       </div>
+      {welcome && (
+        <p className="notice success">
+          お店を登録しました。まずは下の「お店」「席」「受付ルール」と「SNSの接続」を設定し、「スタッフ」画面の登録用リンクでスタッフを招待してください。
+        </p>
+      )}
       {saved && <p className="notice success">保存しました</p>}
       {error && <p className="notice error">{error}</p>}
       {line === "linked" && <p className="notice success">LINEを連携しました。次からはオーナーのログイン画面で「LINEでログイン」できます。</p>}
       {line === "unlinked" && <p className="notice success">LINEの連携を外しました。</p>}
       {line === "staff_conflict" && <p className="notice error">このLINEはスタッフとして登録されています。オーナー用には別のLINEアカウントを使ってください。</p>}
 
+      {session?.memberId ? (
+        <section className="card">
+          <h2 style={{ marginTop: 0 }}>あなたのログイン</h2>
+          <p>
+            ログインID・パスワードの変更と、LINEでログインするための連携は <a href="/admin/account">アカウント</a> の画面でできます。
+          </p>
+          <p className="muted">
+            オーナーのログイン画面: <code>{appBase}/owner/login</code>　スタッフのログイン画面: <code>{appBase}/login</code>
+          </p>
+        </section>
+      ) : (
       <section className="card">
         <h2 style={{ marginTop: 0 }}>オーナーのログイン</h2>
         <form action={saveOwnerLoginIdAction} className="row" style={{ alignItems: "flex-end" }}>
@@ -70,7 +108,7 @@ export default async function SettingsPage({
           <button type="submit">IDを保存</button>
         </form>
         <p className="muted">
-          連携すると、オーナーのログイン画面（{base}/owner/login）で「LINEでログイン」できます。スタッフは {base}/login からログインします。
+          連携すると、オーナーのログイン画面（{appBase}/owner/login）で「LINEでログイン」できます。スタッフは {appBase}/login からログインします。
         </p>
         <p>連携しているLINE：{s.ownerLineUserIds.length}件</p>
         {lineLoginConfig() ? (
@@ -86,6 +124,45 @@ export default async function SettingsPage({
           <p className="notice">LINEログインのチャネルが未設定です（LINE_LOGIN_CHANNEL_ID・LINE_LOGIN_CHANNEL_SECRET）。</p>
         )}
       </section>
+      )}
+
+      <section className="card">
+        <h2 style={{ marginTop: 0 }}>お店のURL名</h2>
+        <form action={saveShopSlugAction} className="row" style={{ alignItems: "flex-end" }}>
+          <label style={{ flex: 1, marginBottom: 0 }}>
+            予約フォームなどのアドレスに使います（半角英小文字・数字・ハイフン）。変えると、SNSに載せたリンクも変わります
+            <input name="slug" required defaultValue={shop?.slug} pattern="[a-z0-9][a-z0-9\-]{1,30}" autoCapitalize="none" spellCheck={false} />
+          </label>
+          <button type="submit">保存</button>
+        </form>
+      </section>
+
+      <form action={saveSnsConnectionsAction} className="card">
+        <h2 style={{ marginTop: 0 }}>SNSの接続（このお店のLINE公式アカウント・Instagram）</h2>
+        <p className="muted">
+          入力した値は暗号化して保存します。空欄のまま保存すると、今の値をそのまま使います（消す場合は「消す」にチェック）。
+        </p>
+        <h3>LINE公式アカウント（Messaging API）</h3>
+        <p className="muted">
+          LINE Developers の Messaging API チャネルの値を入れ、Webhook URL に <code>{appBase}/api/webhooks/line/{shopId}</code> を登録してください。
+        </p>
+        <SecretField name="lineChannelSecret" label="チャネルシークレット" saved={!!secrets.lineChannelSecret} />
+        <SecretField name="lineChannelAccessToken" label="チャネルアクセストークン（長期）" saved={!!secrets.lineChannelAccessToken} />
+        <label>
+          店主への通知先（店主がこの公式アカウントを友だち追加したときのユーザーID。Uで始まる文字列）
+          <input name="ownerNotifyLineUserId" defaultValue={s.ownerNotifyLineUserId} autoCapitalize="none" spellCheck={false} />
+        </label>
+        <h3>Instagram（任意）</h3>
+        <p className="muted">
+          Webhook のコールバックURLに <code>{appBase}/api/webhooks/instagram/{shopId}</code> を登録してください。
+        </p>
+        <SecretField name="instagramAccessToken" label="アクセストークン" saved={!!secrets.instagramAccessToken} />
+        <SecretField name="instagramAppSecret" label="アプリシークレット" saved={!!secrets.instagramAppSecret} />
+        <SecretField name="instagramVerifyToken" label="Webhookの確認トークン（自分で決めた文字列）" saved={!!secrets.instagramVerifyToken} />
+        <button type="submit" className="primary">
+          接続を保存
+        </button>
+      </form>
       {pulled && (
         <p className={`notice ${failed ? "error" : "success"}`}>
           カレンダーから取り込みました: 時間変更 {moved}件・削除 {deleted}件{failed ? `・取得できなかった予定 ${failed}件` : ""}
@@ -352,7 +429,7 @@ export default async function SettingsPage({
         <dl className="links">
           <dt>LINE（メイン）</dt>
           <dd>
-            トークでそのまま予約を自動受付。リッチメニューには <code>{base}/reserve</code>
+            トークでそのまま予約を自動受付。リッチメニューには <code>{shopUrl}/reserve</code>
             {s.lineFriendUrl ? (
               <>
                 <br />友だち追加: <code>{s.lineFriendUrl}</code>
@@ -366,11 +443,11 @@ export default async function SettingsPage({
           </dd>
           <dt>Instagram</dt>
           <dd>
-            DMを自動受付（連携した場合）。プロフィールのリンクには <code>{base}/reserve</code>
+            DMを自動受付（連携した場合）。プロフィールのリンクには <code>{shopUrl}/reserve</code>
           </dd>
           <dt>X（Twitter）</dt>
           <dd>
-            プロフィールと投稿に <code>{base}/reserve?from=x</code>
+            プロフィールと投稿に <code>{shopUrl}/reserve?from=x</code>
             <br />
             <span className="muted">
               XのDMの自動受付は、XのAPIが有料（従量課金）のため使っていません。このリンクからの予約は「X」として集計されます。
@@ -379,20 +456,7 @@ export default async function SettingsPage({
         </dl>
       </section>
 
-      <section className="card">
-        <h2 style={{ marginTop: 0 }}>SNSの接続先（Webhook URL）</h2>
-        <p className="muted">各サービスの管理画面に、以下のURLを登録してください。</p>
-        <ul>
-          <li>
-            LINE: <code>{base}/api/webhooks/line</code>
-            {process.env.LINE_CHANNEL_SECRET ? " ✓" : "（未設定）"}
-          </li>
-          <li>
-            Instagram: <code>{base}/api/webhooks/instagram</code>
-            {process.env.INSTAGRAM_APP_SECRET ? " ✓" : "（未設定）"}
-          </li>
-        </ul>
-      </section>
+
     </>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { repository } from "@/lib/container";
+import { directory, repository } from "@/lib/container";
+import { withShop } from "@/lib/shop-context";
 import { ORDER_STATUS_LABEL } from "@/lib/domain/types";
 import { businessDayStart, placeOrder } from "@/lib/order-service";
 import { MenuForm } from "./menu-form";
@@ -19,6 +20,20 @@ export default async function OrderPage({
 }) {
   const { token } = await params;
   const { done, error } = await searchParams;
+  // QRコードの文字列から店舗を決める
+  const shopId = await directory().findShopIdByTableToken(token);
+  const shop = shopId ? await directory().getShop(shopId) : null;
+  if (!shopId || !shop?.active) {
+    return (
+      <main className="container" style={{ maxWidth: 520, paddingTop: 32 }}>
+        <p className="notice error">このQRコードは使えません。お手数ですがスタッフにお声がけください。</p>
+      </main>
+    );
+  }
+  return withShop(shopId, () => renderOrder(shopId, token, done, error));
+}
+
+async function renderOrder(shopId: string, token: string, done: string | undefined, error: string | undefined) {
   const repo = repository();
   const [settings, table] = await Promise.all([repo.getSettings(), repo.getOrderTableByToken(token)]);
 
@@ -27,7 +42,7 @@ export default async function OrderPage({
     const items = [...formData.entries()]
       .filter(([k]) => k.startsWith("qty_"))
       .map(([k, v]) => ({ menuItemId: k.slice(4), qty: Number(v) }));
-    const result = await placeOrder(repository(), { token, items, note: String(formData.get("note") ?? "") });
+    const result = await withShop(shopId, () => placeOrder(repository(), { token, items, note: String(formData.get("note") ?? "") }));
     redirect(`/order/${encodeURIComponent(token)}?${result.ok ? "done=1" : `error=${encodeURIComponent(result.error)}`}`);
   }
 

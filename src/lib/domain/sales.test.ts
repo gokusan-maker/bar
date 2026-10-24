@@ -11,6 +11,7 @@ const staff = (id: string, rates: Partial<Staff["backRates"]> = {}, active = tru
   pending: false,
   lineUserId: null,
   loginId: null,
+  role: "staff",
   createdAt: "",
 });
 

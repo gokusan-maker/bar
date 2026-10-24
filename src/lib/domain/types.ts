@@ -176,8 +176,10 @@ export interface ShopSettings {
   promoImageKey: string;
   /** 最後に配信した営業日（同じ日に二重に送らないため） */
   promoLastSentDate: string;
-  /** LINEでログインできる店主のLINEユーザーID（設定画面で連携） */
+  /** LINEでログインできる店主のLINEユーザーID（設定画面で連携。店舗1の旧オーナー用） */
   ownerLineUserIds: string[];
+  /** 店主への通知を送るLINEユーザーID（この店のLINE公式アカウントを友だち追加した店主） */
+  ownerNotifyLineUserId: string;
   /** オーナーのログインID（パスワードは ADMIN_PASSWORD） */
   ownerLoginId: string;
   /** 誕生日の当日にLINEでお祝いを送る */
@@ -227,6 +229,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   promoImageKey: "",
   promoLastSentDate: "",
   ownerLineUserIds: [],
+  ownerNotifyLineUserId: "",
   ownerLoginId: "admin",
   birthdayGreetingEnabled: false,
   birthdayMessage: "{name}様、お誕生日おめでとうございます🎂\n素敵な1年になりますように。今月ご来店の際は、お祝いに1杯サービスいたします🥂",
@@ -238,8 +241,33 @@ export interface BackRates {
   perVisit: number;
 }
 
+/** これまでのデータ（1店舗だけだったころ）を入れた店舗 */
+export const DEFAULT_SHOP_ID = "00000000-0000-4000-8000-000000000001";
+
+export interface Shop {
+  id: string;
+  name: string;
+  /** 公開URL（予約フォームなど）に使う短い名前 */
+  slug: string;
+  active: boolean;
+  createdAt: string;
+}
+
+/** 店舗ごとのSNS接続の秘密情報（暗号化して保存） */
+export interface ShopSecrets {
+  lineChannelSecret?: string;
+  lineChannelAccessToken?: string;
+  instagramAccessToken?: string;
+  instagramAppSecret?: string;
+  instagramVerifyToken?: string;
+}
+
+export type MemberRole = "owner" | "staff";
+
 export interface Staff {
   id: string;
+  /** owner=オーナー（店のすべてを決める）、staff=スタッフ */
+  role: MemberRole;
   name: string;
   backRates: BackRates;
   active: boolean;

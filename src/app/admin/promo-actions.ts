@@ -67,7 +67,7 @@ export async function uploadPromoImageAction(formData: FormData) {
 export async function sendPromoNowAction(formData: FormData) {
   await requireStaff();
   if (formData.get("confirm") !== "on") go({ error: "「友だち全員に送る」にチェックを入れてください" });
-  const result = await promoService().sendNow();
+  const result = await (await promoService()).sendNow();
   if (!result.sent) go({ error: result.reason ?? "配信できませんでした" });
   const where = [result.line && "LINE", result.instagram && "Instagram"].filter(Boolean).join("・");
   go({ sent: where, ...(result.reason ? { error: result.reason } : {}) });

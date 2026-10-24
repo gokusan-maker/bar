@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { recordAudit } from "@/lib/audit";
-import { lineLoginConfig, notifier, repository } from "@/lib/container";
+import { reservedLoginIds } from "@/lib/auth";
+import { directory, lineLoginConfig, notifier, repository, shopRepository } from "@/lib/container";
+import { withShop } from "@/lib/shop-context";
 import { LineLoginButton } from "../login/line-button";
 import { clientIp, isLockedOut, recordFailure } from "@/lib/login-guard";
 import { isValidInviteCode, MIN_PASSWORD_LENGTH, registerStaff } from "@/lib/staff-accounts";
@@ -23,30 +25,28 @@ async function joinAction(formData: FormData) {
   if (field("password") !== field("password2"))
     back({ error: "確認用のパスワードが一致しません", name: field("name"), loginId: field("loginId") });
 
-  const repo = repository();
-  const result = await registerStaff(repo, {
-    code,
-    name: field("name"),
-    password: field("password"),
-    loginId: field("loginId"),
-  });
-  if (!result.ok) {
+  // 招待リンクの合言葉から店舗を決める
+  const shopId = await directory().findShopIdByInviteCode(code);
+  if (!shopId) {
     // 合言葉の総当たりを防ぐため、ログイン失敗と同じく数える
-    if (!(await isValidInviteCode(repo, code))) await recordFailure(ip);
+    await recordFailure(ip);
+    back({ error: "このリンクは使えません。店主に新しいリンクをもらってください" });
+  }
+  const result = await withShop(shopId!, async () =>
+    registerStaff(repository(), directory(), { code, name: field("name"), password: field("password"), loginId: field("loginId") }, await reservedLoginIds()),
+  );
+  if (!result.ok) {
     back({ error: result.error, name: field("name"), loginId: field("loginId") });
   } else {
-    await recordAudit({
-      actor: "staff",
-      action: "スタッフ登録を申請",
-      targetType: "staff",
-      targetId: result.staff.id,
-      detail: result.staff.name,
-    });
-    await notifier().notify(
-      `スタッフ登録の申請がありました: ${result.staff.name}\n管理画面の「スタッフ」で承認してください`,
-    );
+    await withShop(shopId!, () => announceJoin(result.staff.id, result.staff.name));
     back({ done: "1" });
   }
+}
+
+/** 申請を履歴に残し、店主に知らせる */
+async function announceJoin(staffId: string, name: string) {
+  await recordAudit({ actor: "staff", action: "スタッフ登録を申請", targetType: "staff", targetId: staffId, detail: name });
+  await notifier().notify(`スタッフ登録の申請がありました: ${name}\n管理画面の「スタッフ」で承認してください`);
 }
 
 export default async function JoinPage({
@@ -61,11 +61,12 @@ export default async function JoinPage({
   }>;
 }) {
   const { code = "", error, done, name, loginId } = await searchParams;
-  const settings = await repository().getSettings();
-  const valid = await isValidInviteCode(repository(), code);
+  const shopId = await directory().findShopIdByInviteCode(code);
+  const shopName = shopId ? (await shopRepository(shopId).getSettings()).shopName : "";
+  const valid = !!shopId && (await isValidInviteCode(shopRepository(shopId), code));
   return (
     <main className="container" style={{ maxWidth: 420, paddingTop: 48 }}>
-      <h1>{settings.shopName} スタッフ登録</h1>
+      <h1>{shopName} スタッフ登録</h1>
       {done ? (
         <div className="card">
           <p className="notice success">申請しました。店主が承認すると、ログインできるようになります。</p>

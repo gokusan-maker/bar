@@ -1,7 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { authMode } from "./auth";
-import { appBaseUrl, googleOAuthConfig, instagramClient, lineClient, lineLoginConfig, repository } from "./container";
+import { appBaseUrl, googleOAuthConfig, instagramClient, lineClient, lineLoginConfig, ownerNotifyLineUserId, repository, shopSecrets } from "./container";
 import { listCalendars } from "./integrations/google-calendar";
 import { DB_SCHEMA, EVIDENCE_BUCKET, supabaseClient } from "./repo/supabase";
 
@@ -107,14 +107,14 @@ export async function runDiagnostics(): Promise<Check[]> {
 
   checks.push(
     safe("LINE公式アカウント", async () => {
-      const client = lineClient();
-      if (!client || !env("LINE_CHANNEL_SECRET")) {
-        return { name: "LINE公式アカウント", status: "off", detail: "未設定（LINE_CHANNEL_SECRET・LINE_CHANNEL_ACCESS_TOKEN）" };
+      const [client, secrets, owner] = await Promise.all([lineClient(), shopSecrets(), ownerNotifyLineUserId()]);
+      if (!client || !secrets.lineChannelSecret) {
+        return { name: "LINE公式アカウント", status: "off", detail: "未接続（設定 →「SNSの接続」でチャネルシークレットとアクセストークンを入れてください）" };
       }
       const name = await client.botName();
-      return env("OWNER_LINE_USER_ID")
+      return owner
         ? { name: "LINE公式アカウント", status: "ok", detail: `${name}・店主への通知先あり` }
-        : { name: "LINE公式アカウント", status: "warn", detail: `${name}（OWNER_LINE_USER_ID 未設定のため店主に通知が届きません）` };
+        : { name: "LINE公式アカウント", status: "warn", detail: `${name}（店主への通知先が未設定のため、通知が届きません）` };
     }),
   );
 
@@ -128,12 +128,12 @@ export async function runDiagnostics(): Promise<Check[]> {
 
   checks.push(
     safe("Instagram", async () => {
-      const client = instagramClient();
-      if (!client || !env("INSTAGRAM_APP_SECRET")) return { name: "Instagram", status: "off", detail: "未設定（使わない場合はこのままで問題ありません）" };
+      const [client, secrets] = await Promise.all([instagramClient(), shopSecrets()]);
+      if (!client || !secrets.instagramAppSecret) return { name: "Instagram", status: "off", detail: "未接続（使わない場合はこのままで問題ありません）" };
       const username = await client.me();
-      return env("INSTAGRAM_VERIFY_TOKEN")
+      return secrets.instagramVerifyToken
         ? { name: "Instagram", status: "ok", detail: `@${username}` }
-        : { name: "Instagram", status: "warn", detail: `@${username}（INSTAGRAM_VERIFY_TOKEN 未設定のためWebhookを登録できません）` };
+        : { name: "Instagram", status: "warn", detail: `@${username}（確認トークンが未設定のためWebhookを登録できません）` };
     }),
   );
 

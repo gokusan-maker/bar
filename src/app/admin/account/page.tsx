@@ -8,10 +8,11 @@ import { changeOwnLoginIdAction, changeOwnPasswordAction } from "./actions";
 /** スタッフ本人のアカウント（LINEの連携・パスワード） */
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ linked?: string; saved?: string; error?: string }> }) {
   const session = await currentSession();
-  if (session?.role === "owner") redirect("/admin/settings");
   if (!session) redirect("/login");
+  // 店舗1の旧オーナー（ADMIN_PASSWORD）は自分のアカウントがないので設定画面へ
+  if (session.role === "owner" && !session.memberId) redirect("/admin/settings");
   const { linked, saved, error } = await searchParams;
-  const me = session.staffId ? await repository().getStaff(session.staffId) : null;
+  const me = session.memberId ? await repository().getStaff(session.memberId) : null;
 
   return (
     <>
@@ -28,7 +29,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <p>LINEでログイン：{me.lineUserId ? "連携済み" : "未連携"}</p>
             {!me.lineUserId &&
               (lineLoginConfig() ? (
-                <LineLoginButton purpose="link-staff" label="LINEと連携する" />
+                <LineLoginButton purpose={me.role === "owner" ? "link-owner" : "link-staff"} label="LINEと連携する" />
               ) : (
                 <p className="muted">LINEログインが設定されていません（店主にお問い合わせください）。</p>
               ))}

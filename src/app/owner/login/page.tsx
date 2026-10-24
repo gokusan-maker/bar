@@ -53,6 +53,8 @@ export default async function OwnerLoginPage({ searchParams }: { searchParams: P
       </form>
       <p>
         <Link href="/login">スタッフの方はこちら</Link>
+        {" ・ "}
+        <Link href="/signup">お店を新しく登録する</Link>
       </p>
     </main>
   );

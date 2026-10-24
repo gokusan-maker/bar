@@ -12,6 +12,7 @@ import {
   type Sale,
   type ShopSettings,
   type MenuItem,
+  type ShopSecrets,
   type Order,
   type OrderTable,
   type Staff,
@@ -50,6 +51,7 @@ export class MemoryRepository implements Repository {
   private orderTables = new Map<string, OrderTable>();
   private orders = new Map<string, Order>();
   private promoImages = new Map<string, { data: Uint8Array; contentType: string }>();
+  private secrets: ShopSecrets = {};
   /** 同一ミリ秒でも作成順が決まるように使う */
   private seq = 0;
 
@@ -208,8 +210,16 @@ export class MemoryRepository implements Repository {
 
   async listStaff() {
     return [...this.staff.values()]
+      .filter((s) => s.role === "staff")
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .map((s) => ({ ...s, backRates: { ...s.backRates } }));
+  }
+  async listOwners() {
+    return [...this.staff.values()].filter((s) => s.role === "owner").map((s) => ({ ...s, backRates: { ...s.backRates } }));
+  }
+  /** 店舗をまたいだ検索用（ShopDirectory から使う） */
+  allMembers(): Staff[] {
+    return [...this.staff.values()].map((s) => ({ ...s, backRates: { ...s.backRates } }));
   }
   async getStaff(id: string) {
     const s = this.staff.get(id);
@@ -221,6 +231,7 @@ export class MemoryRepository implements Repository {
       pending: false,
       lineUserId: null,
       loginId: null,
+      role: "staff",
       ...input,
       backRates: { ...input.backRates },
       id: randomUUID(),
@@ -405,6 +416,17 @@ export class MemoryRepository implements Repository {
     if (!o) throw new Error(`order not found: ${id}`);
     Object.assign(o, patch, { updatedAt: this.stamp() });
     return structuredClone(o);
+  }
+
+  async getSecrets() {
+    return { ...this.secrets };
+  }
+  async saveSecrets(secrets: ShopSecrets) {
+    this.secrets = { ...secrets };
+  }
+  /** 店舗をまたいだ検索用（ShopDirectory から使う） */
+  allOrderTables(): OrderTable[] {
+    return [...this.orderTables.values()].map((t) => ({ ...t }));
   }
 
   async savePromoImage(key: string, data: Uint8Array, contentType: string) {
