@@ -18,9 +18,13 @@ function LoginFields({ s }: { s?: Staff }) {
     <details>
       <summary>
         {!s
-          ? "ログイン用パスワード（任意）"
-          : `ログイン：${[s.lineUserId && "LINE", s.passwordHash && "パスワード"].filter(Boolean).join("・") || "なし"}`}
+          ? "ログインIDとパスワード（任意）"
+          : `ログイン：${[s.lineUserId && "LINE", s.passwordHash && `ID「${s.loginId ?? s.name}」とパスワード`].filter(Boolean).join("・") || "なし"}`}
       </summary>
+      <label>
+        ログインID（半角英数字3〜30文字）
+        <input name="loginId" defaultValue={s?.loginId ?? ""} autoCapitalize="none" spellCheck={false} maxLength={30} />
+      </label>
       <label>
         ログイン用パスワードを{s?.passwordHash ? "変更" : "設定"}（{MIN_PASSWORD_LENGTH}文字以上。空欄なら変えません）
         <input type="password" name="password" minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />

@@ -71,6 +71,7 @@ const toStaff = (r: any): Staff => ({
   passwordHash: r.password_hash ?? null,
   pending: r.pending ?? false,
   lineUserId: r.line_user_id ?? null,
+  loginId: r.login_id ?? null,
   createdAt: r.created_at,
 });
 
@@ -444,6 +445,7 @@ export class SupabaseRepository implements Repository {
           password_hash: input.passwordHash ?? null,
           pending: input.pending ?? false,
           line_user_id: input.lineUserId ?? null,
+          login_id: input.loginId ?? null,
         })
         .select()
         .single(),
@@ -458,6 +460,7 @@ export class SupabaseRepository implements Repository {
     if (patch.passwordHash !== undefined) row.password_hash = patch.passwordHash;
     if (patch.pending !== undefined) row.pending = patch.pending;
     if (patch.lineUserId !== undefined) row.line_user_id = patch.lineUserId;
+    if (patch.loginId !== undefined) row.login_id = patch.loginId;
     return toStaff(check(await this.db.from("staff").update(row).eq("id", id).select().single()));
   }
 

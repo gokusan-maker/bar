@@ -220,6 +220,7 @@ export class MemoryRepository implements Repository {
       passwordHash: null,
       pending: false,
       lineUserId: null,
+      loginId: null,
       ...input,
       backRates: { ...input.backRates },
       id: randomUUID(),

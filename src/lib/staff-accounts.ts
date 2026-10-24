@@ -12,6 +12,21 @@ export const normalizeStaffName = (name: string) => name.normalize("NFKC").repla
 
 export const newInviteCode = () => randomBytes(16).toString("base64url");
 
+/** ログインIDは大文字・小文字を区別しない（全角も半角にそろえる） */
+export const normalizeLoginId = (id: string) => id.normalize("NFKC").trim().toLowerCase();
+
+/** ログインIDとして使えるか。使えなければ理由 */
+export function loginIdProblem(id: string): string | null {
+  if (!/^[a-z0-9][a-z0-9_.-]{2,29}$/.test(id)) return "ログインIDは3〜30文字の半角英数字（- _ . も可）にしてください";
+  return null;
+}
+
+/** ほかのスタッフ・オーナーが使っていないか */
+export async function loginIdTaken(repo: Repository, id: string, exceptStaffId?: string): Promise<boolean> {
+  if (normalizeLoginId((await repo.getSettings()).ownerLoginId) === id) return true;
+  return (await repo.listStaff()).some((s) => s.loginId === id && s.id !== exceptStaffId);
+}
+
 function sameCode(input: string, expected: string): boolean {
   const a = Buffer.from(input);
   const b = Buffer.from(expected);
@@ -36,7 +51,7 @@ export type RegisterResult = { ok: true; staff: Staff } | { ok: false; error: st
  */
 export async function registerStaff(
   repo: Repository,
-  input: { code: string; name: string; password: string },
+  input: { code: string; name: string; password: string; loginId: string },
 ): Promise<RegisterResult> {
   if (!(await isValidInviteCode(repo, input.code))) {
     return { ok: false, error: "このリンクは使えません。店主に新しいリンクをもらってください" };
@@ -45,6 +60,10 @@ export async function registerStaff(
   if (!name || name.length > 30) return { ok: false, error: "お名前を30文字以内で入力してください" };
   const problem = passwordProblem(input.password);
   if (problem) return { ok: false, error: problem };
+  const loginId = normalizeLoginId(input.loginId);
+  const idProblem = loginIdProblem(loginId);
+  if (idProblem) return { ok: false, error: idProblem };
+  if (await loginIdTaken(repo, loginId)) return { ok: false, error: "このログインIDはすでに使われています。別のIDにしてください" };
 
   const staff = await repo.listStaff();
   if (staff.filter((s) => s.pending).length >= MAX_PENDING) {
@@ -57,23 +76,30 @@ export async function registerStaff(
   }
   const passwordHash = hashPassword(input.password);
   const created = existing
-    ? await repo.updateStaff(existing.id, { passwordHash, pending: true })
+    ? await repo.updateStaff(existing.id, { passwordHash, loginId, pending: true })
     : await repo.createStaff({
         name,
         backRates: { rate: 0, perVisit: 0 },
         active: true,
         passwordHash,
+        loginId,
         pending: true,
       });
   return { ok: true, staff: created };
 }
 
-/** スタッフ本人のパスワードでのログイン。承認済み・在籍中・パスワードありのスタッフだけ */
-export async function authenticateStaff(repo: Repository, name: string, password: string): Promise<Staff | null> {
-  const key = normalizeStaffName(name);
+/**
+ * スタッフ本人のIDとパスワードでのログイン。承認済み・在籍中・パスワードありのスタッフだけ。
+ * ログインIDで探し、見つからなければ名前で探す（ID導入前に名前で登録した人のため）。
+ */
+export async function authenticateStaff(repo: Repository, idOrName: string, password: string): Promise<Staff | null> {
+  const all = (await repo.listStaff()).filter((x) => canLogin(x) && x.passwordHash);
+  const byId = all.find((x) => x.loginId === normalizeLoginId(idOrName));
+  if (byId) return verifyPassword(password, byId.passwordHash) ? byId : null;
+  const key = normalizeStaffName(idOrName);
   if (!key) return null;
   // LINEだけで登録した同じ名前のスタッフがいても、パスワードのある人で確かめる
-  const candidates = (await repo.listStaff()).filter((x) => normalizeStaffName(x.name) === key && canLogin(x) && x.passwordHash);
+  const candidates = all.filter((x) => normalizeStaffName(x.name) === key);
   return candidates.find((s) => verifyPassword(password, s.passwordHash)) ?? null;
 }
 

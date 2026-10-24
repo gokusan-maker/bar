@@ -3,7 +3,7 @@ import { currentSession } from "@/lib/auth";
 import { lineLoginConfig, repository } from "@/lib/container";
 import { MIN_PASSWORD_LENGTH } from "@/lib/staff-accounts";
 import { LineLoginButton } from "../../login/line-button";
-import { changeOwnPasswordAction } from "./actions";
+import { changeOwnLoginIdAction, changeOwnPasswordAction } from "./actions";
 
 /** スタッフ本人のアカウント（LINEの連携・パスワード） */
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ linked?: string; saved?: string; error?: string }> }) {
@@ -17,7 +17,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     <>
       <h1>アカウント</h1>
       {linked && <p className="notice success">LINEを連携しました。次からは「LINEでログイン」でログインできます。</p>}
-      {saved && <p className="notice success">パスワードを保存しました</p>}
+      {saved && <p className="notice success">{saved === "id" ? "ログインIDを保存しました" : "パスワードを保存しました"}</p>}
       {error && <p className="notice error">{error}</p>}
       {!me ? (
         <p className="notice">共通のスタッフ用パスワードでログインしています。自分のアカウントを作るには、店主から登録用リンクをもらってください。</p>
@@ -33,6 +33,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 <p className="muted">LINEログインが設定されていません（店主にお問い合わせください）。</p>
               ))}
           </section>
+          <form action={changeOwnLoginIdAction} className="card">
+            <h2 style={{ marginTop: 0 }}>ログインID</h2>
+            <label>
+              IDとパスワードでログインするときのID（半角英数字3〜30文字）
+              <input name="loginId" required defaultValue={me.loginId ?? ""} autoCapitalize="none" spellCheck={false} maxLength={30} />
+            </label>
+            <button type="submit">保存</button>
+          </form>
           <form action={changeOwnPasswordAction} className="card">
             <h2 style={{ marginTop: 0 }}>{me.passwordHash ? "パスワードを変える" : "パスワードを決める（LINEが使えないとき用）"}</h2>
             {me.passwordHash && (

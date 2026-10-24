@@ -27,29 +27,28 @@ export default async function StaffLoginPage({ searchParams }: { searchParams: P
       {error && <p className="notice error">{LINE_LOGIN_ERRORS_STAFF[error] ?? LOGIN_ERRORS[error] ?? LOGIN_ERRORS["1"]}</p>}
       {lineLoginConfig() && (
         <section className="card">
+          <h2 style={{ marginTop: 0 }}>LINEでログイン</h2>
           <LineLoginButton purpose="staff" />
           <p className="muted" style={{ marginBottom: 0 }}>
             はじめての方は、店主から届いた登録用リンクから「LINEで登録」してください。
           </p>
         </section>
       )}
-      <details className="card" open={!lineLoginConfig()}>
-        <summary>名前とパスワードでログイン</summary>
-        <form action={loginAction}>
-          <label>
-            お名前
-            <input name="staffName" autoComplete="username" maxLength={30} />
-            <span className="muted">共通のスタッフ用パスワードの場合は空欄</span>
-          </label>
-          <label>
-            パスワード
-            <input type="password" name="password" required autoComplete="current-password" />
-          </label>
-          <button className="primary" type="submit">
-            ログイン
-          </button>
-        </form>
-      </details>
+      <form action={loginAction} className="card">
+        <h2 style={{ marginTop: 0 }}>IDとパスワードでログイン</h2>
+        <label>
+          ログインID（またはお名前）
+          <input name="staffName" autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={30} />
+          <span className="muted">共通のスタッフ用パスワードの場合は空欄</span>
+        </label>
+        <label>
+          パスワード
+          <input type="password" name="password" required autoComplete="current-password" />
+        </label>
+        <button className="primary" type="submit">
+          ログイン
+        </button>
+      </form>
       <p>
         <Link href="/owner/login">オーナーの方はこちら</Link>
       </p>

@@ -9,13 +9,13 @@ async function ownerLoginAction(formData: FormData) {
   "use server";
   const ip = await clientIp();
   if (await isLockedOut(ip)) redirect("/owner/login?error=locked");
-  if (await loginOwner(String(formData.get("password") ?? ""))) redirect("/admin");
+  if (await loginOwner(String(formData.get("loginId") ?? ""), String(formData.get("password") ?? ""))) redirect("/admin");
   await recordFailure(ip);
   redirect("/owner/login?error=password");
 }
 
 const OWNER_ERRORS: Record<string, string> = {
-  password: "パスワードが違います",
+  password: "ログインIDかパスワードが違います",
   line_unlinked: "このLINEはオーナーとして連携されていません。パスワードでログインし、「設定」→「LINEでログインできるようにする」から連携してください。",
 };
 
@@ -33,12 +33,18 @@ export default async function OwnerLoginPage({ searchParams }: { searchParams: P
       {error && <p className="notice error">{OWNER_ERRORS[error] ?? LOGIN_ERRORS[error] ?? OWNER_ERRORS.password}</p>}
       {lineLoginConfig() && (
         <section className="card">
+          <h2 style={{ marginTop: 0 }}>LINEでログイン</h2>
           <LineLoginButton purpose="owner" />
         </section>
       )}
       <form action={ownerLoginAction} className="card">
+        <h2 style={{ marginTop: 0 }}>IDとパスワードでログイン</h2>
         <label>
-          オーナー用パスワード
+          ログインID
+          <input name="loginId" required autoComplete="username" autoCapitalize="none" spellCheck={false} />
+        </label>
+        <label>
+          パスワード
           <input type="password" name="password" required autoComplete="current-password" />
         </label>
         <button className="primary" type="submit">

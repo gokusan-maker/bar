@@ -21,18 +21,19 @@ async function joinAction(formData: FormData) {
   const ip = await clientIp();
   if (await isLockedOut(ip)) back({ error: "しばらく時間をおいてからお試しください" });
   if (field("password") !== field("password2"))
-    back({ error: "確認用のパスワードが一致しません", name: field("name") });
+    back({ error: "確認用のパスワードが一致しません", name: field("name"), loginId: field("loginId") });
 
   const repo = repository();
   const result = await registerStaff(repo, {
     code,
     name: field("name"),
     password: field("password"),
+    loginId: field("loginId"),
   });
   if (!result.ok) {
     // 合言葉の総当たりを防ぐため、ログイン失敗と同じく数える
     if (!(await isValidInviteCode(repo, code))) await recordFailure(ip);
-    back({ error: result.error, name: field("name") });
+    back({ error: result.error, name: field("name"), loginId: field("loginId") });
   } else {
     await recordAudit({
       actor: "staff",
@@ -56,9 +57,10 @@ export default async function JoinPage({
     error?: string;
     done?: string;
     name?: string;
+    loginId?: string;
   }>;
 }) {
-  const { code = "", error, done, name } = await searchParams;
+  const { code = "", error, done, name, loginId } = await searchParams;
   const settings = await repository().getSettings();
   const valid = await isValidInviteCode(repository(), code);
   return (
@@ -92,7 +94,21 @@ export default async function JoinPage({
               <input type="hidden" name="code" value={code} />
               <label>
                 お名前（ログインのときに使います）
-                <input name="name" required maxLength={30} defaultValue={name} autoComplete="username" />
+                <input name="name" required maxLength={30} defaultValue={name} />
+              </label>
+              <label>
+                ログインID（半角英数字3〜30文字。例: yuka）
+                <input
+                  name="loginId"
+                  required
+                  minLength={3}
+                  maxLength={30}
+                  pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{2,29}"
+                  defaultValue={loginId}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
               </label>
               <label>
                 パスワード（{MIN_PASSWORD_LENGTH}文字以上）

@@ -5,9 +5,22 @@ import { currentSession, loginWithLine } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { repository } from "@/lib/container";
 import { hashPassword, verifyPassword } from "@/lib/password";
-import { passwordProblem } from "@/lib/staff-accounts";
+import { loginIdProblem, loginIdTaken, normalizeLoginId, passwordProblem } from "@/lib/staff-accounts";
 
 const back = (params: Record<string, string>): never => redirect(`/admin/account?${new URLSearchParams(params)}`);
+
+/** スタッフが自分のログインIDを決める・変える */
+export async function changeOwnLoginIdAction(formData: FormData) {
+  const session = await currentSession();
+  if (session?.role !== "staff" || !session.staffId) redirect("/login");
+  const repo = repository();
+  const id = normalizeLoginId(String(formData.get("loginId") ?? ""));
+  const problem = loginIdProblem(id);
+  if (problem) back({ error: problem });
+  if (await loginIdTaken(repo, id, session.staffId)) back({ error: "このログインIDはすでに使われています" });
+  await repo.updateStaff(session.staffId, { loginId: id });
+  back({ saved: "id" });
+}
 
 /** スタッフが自分のパスワードを決める・変える（LINEだけで登録した人は今のパスワードなしで決められる） */
 export async function changeOwnPasswordAction(formData: FormData) {

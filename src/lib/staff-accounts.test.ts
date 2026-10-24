@@ -23,7 +23,9 @@ describe("staff self-registration", () => {
     await repo.saveSettings({ ...(await repo.getSettings()), staffInviteCode: code });
   });
 
-  const register = (name: string, password = "password1", c = code) => registerStaff(repo, { code: c, name, password });
+  let n = 0;
+  const register = (name: string, password = "password1", c = code, loginId = `staff${++n}`) =>
+    registerStaff(repo, { code: c, name, password, loginId });
 
   it("rejects a wrong or disabled invite code", async () => {
     expect((await register("ゆか", "password1", "wrong")).ok).toBe(false);
@@ -104,5 +106,24 @@ describe("staff LINE login", () => {
     await repo.createStaff({ name: "ゆか", active: true, backRates: { rate: 0, perVisit: 0 }, lineUserId: "U5" });
     const withPassword = await repo.createStaff({ name: "ゆか", active: true, backRates: { rate: 0, perVisit: 0 }, passwordHash: hashPassword("password1") });
     expect((await authenticateStaff(repo, "ゆか", "password1"))?.id).toBe(withPassword.id);
+  });
+});
+
+describe("login IDs", () => {
+  it("logs in by login ID (case-insensitive) and still by name, and keeps IDs unique", async () => {
+    const repo = new MemoryRepository();
+    const code = newInviteCode();
+    await repo.saveSettings({ ...(await repo.getSettings()), staffInviteCode: code });
+    const r = await registerStaff(repo, { code, name: "ゆか", password: "password1", loginId: "Yuka_01" });
+    expect(r).toMatchObject({ ok: true, staff: { loginId: "yuka_01" } });
+    if (!r.ok) return;
+    await repo.updateStaff(r.staff.id, { pending: false });
+    expect((await authenticateStaff(repo, "YUKA_01", "password1"))?.id).toBe(r.staff.id);
+    expect((await authenticateStaff(repo, "ゆか", "password1"))?.id).toBe(r.staff.id);
+    expect(await authenticateStaff(repo, "yuka_01", "wrong-pass")).toBeNull();
+    // 同じID・オーナーのID・使えない文字は登録できない
+    expect(await registerStaff(repo, { code, name: "みき", password: "password1", loginId: "yuka_01" })).toMatchObject({ ok: false });
+    expect(await registerStaff(repo, { code, name: "みき", password: "password1", loginId: "admin" })).toMatchObject({ ok: false });
+    expect(await registerStaff(repo, { code, name: "みき", password: "password1", loginId: "み" })).toMatchObject({ ok: false });
   });
 });

@@ -9,7 +9,7 @@ import { saleTotal } from "@/lib/domain/sales";
 import type { AuditLog, Channel } from "@/lib/domain/types";
 import { validateBackRates, type SaleInput } from "@/lib/sales-service";
 import { hashPassword } from "@/lib/password";
-import { newInviteCode, normalizeStaffName, passwordProblem } from "@/lib/staff-accounts";
+import { loginIdProblem, loginIdTaken, newInviteCode, normalizeLoginId, normalizeStaffName, passwordProblem } from "@/lib/staff-accounts";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 /** "6,000" や "６０００" も受け付ける。空欄は0 */
@@ -144,6 +144,14 @@ export async function saveStaffAction(formData: FormData) {
     const clash = (await repo.listStaff()).some((s) => s.id !== id && (s.passwordHash || s.pending) && normalizeStaffName(s.name) === key);
     if (clash) go("/admin/staff", { error: `「${name}」はほかのスタッフがログインに使っています。名前を変えてください` });
   }
+  // ログインID（空なら消す）
+  const loginIdInput = normalizeLoginId(str(formData, "loginId"));
+  if (loginIdInput) {
+    const problem = loginIdProblem(loginIdInput);
+    if (problem) go("/admin/staff", { error: problem });
+    if (await loginIdTaken(repo, loginIdInput, id || undefined)) go("/admin/staff", { error: `ログインID「${loginIdInput}」はすでに使われています` });
+  }
+  const loginId = loginIdInput || null;
   const login = disableLogin
     ? { passwordHash: null, lineUserId: null, pending: false }
     : password
@@ -151,10 +159,10 @@ export async function saveStaffAction(formData: FormData) {
       : {};
   const loginNote = disableLogin ? "（ログインを止めた）" : password ? "（パスワードを設定）" : "";
   if (id) {
-    await repo.updateStaff(id, { name, backRates, active: formData.get("active") === "on", ...login });
+    await repo.updateStaff(id, { name, backRates, active: formData.get("active") === "on", loginId, ...login });
     await audit("スタッフを更新", "staff", id, `${name} ${rates}${loginNote}`);
   } else {
-    const created = await repo.createStaff({ name, backRates, active: true, passwordHash: null, pending: false, ...login });
+    const created = await repo.createStaff({ name, backRates, active: true, passwordHash: null, pending: false, loginId, ...login });
     await audit("スタッフを追加", "staff", created.id, `${name} ${rates}${loginNote}`);
   }
   go("/admin/staff", { saved: "1" });

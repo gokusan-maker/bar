@@ -6,7 +6,7 @@ import { cache } from "react";
 import { repository } from "./container";
 import { sign, verifySigned } from "./crypto";
 import type { Staff } from "./domain/types";
-import { authenticateStaff, canLogin } from "./staff-accounts";
+import { authenticateStaff, canLogin, normalizeLoginId } from "./staff-accounts";
 
 const COOKIE = "bar_admin";
 const SESSION_DAYS = 30;
@@ -116,20 +116,24 @@ async function startSession(payload: string, expiresAt: number) {
 
 const sessionExpiry = () => Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
 
-/** 店主のログイン画面：ADMIN_PASSWORD だけを受け付ける */
-export async function loginOwner(password: string): Promise<boolean> {
-  if (authMode() !== "password" || !matches(password, process.env.ADMIN_PASSWORD)) return false;
+/** 店主のログイン画面：オーナーのログインID（設定）と ADMIN_PASSWORD */
+export async function loginOwner(loginId: string, password: string): Promise<boolean> {
+  if (authMode() !== "password") return false;
+  const { ownerLoginId } = await repository().getSettings();
+  const idOk = normalizeLoginId(loginId) === normalizeLoginId(ownerLoginId || "admin");
+  // IDが違ってもパスワードの照合はして、どちらが違うか分からないようにする
+  if (!matches(password, process.env.ADMIN_PASSWORD) || !idOk) return false;
   const expiresAt = sessionExpiry();
   await startSession(`owner:${expiresAt}`, expiresAt);
   return true;
 }
 
-/** スタッフのログイン画面：名前があれば本人のパスワード、空なら共通の STAFF_PASSWORD */
-export async function loginStaff(password: string, staffName: string): Promise<boolean> {
+/** スタッフのログイン画面：ログインID（または名前）があれば本人のパスワード、空なら共通の STAFF_PASSWORD */
+export async function loginStaff(password: string, idOrName: string): Promise<boolean> {
   if (authMode() !== "password") return false;
   const expiresAt = sessionExpiry();
-  if (staffName.trim()) {
-    const s = await authenticateStaff(repository(), staffName, password);
+  if (idOrName.trim()) {
+    const s = await authenticateStaff(repository(), idOrName, password);
     if (!s) return false;
     await startSession(`staff:${expiresAt}:${s.id}:${fingerprint(s)}`, expiresAt);
     return true;

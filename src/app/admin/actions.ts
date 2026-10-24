@@ -6,6 +6,7 @@ import { currentRole, logout, requireAdmin, requireStaff } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { repository, reservationService } from "@/lib/container";
 import { isThemeKey } from "@/lib/domain/theme";
+import { loginIdProblem, normalizeLoginId } from "@/lib/staff-accounts";
 import type { ShopSettings } from "@/lib/domain/types";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -149,6 +150,19 @@ export async function saveSettingsAction(formData: FormData) {
   };
   await repo.saveSettings(settings);
   await recordAudit({ actor: "owner", action: "設定を変更", targetType: "settings", targetId: null, detail: null });
+  back("/admin/settings", { saved: "1" });
+}
+
+/** オーナーのログインID（パスワードは ADMIN_PASSWORD のまま） */
+export async function saveOwnerLoginIdAction(formData: FormData) {
+  await requireAdmin();
+  const id = normalizeLoginId(str(formData, "ownerLoginId"));
+  const problem = loginIdProblem(id);
+  if (problem) back("/admin/settings", { error: problem });
+  const repo = repository();
+  if ((await repo.listStaff()).some((s) => s.loginId === id)) back("/admin/settings", { error: "このIDはスタッフが使っています" });
+  await repo.saveSettings({ ...(await repo.getSettings()), ownerLoginId: id });
+  await recordAudit({ actor: "owner", action: "オーナーのログインIDを変更", targetType: "settings", targetId: null, detail: id });
   back("/admin/settings", { saved: "1" });
 }
 

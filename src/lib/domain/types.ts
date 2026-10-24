@@ -178,6 +178,8 @@ export interface ShopSettings {
   promoLastSentDate: string;
   /** LINEでログインできる店主のLINEユーザーID（設定画面で連携） */
   ownerLineUserIds: string[];
+  /** オーナーのログインID（パスワードは ADMIN_PASSWORD） */
+  ownerLoginId: string;
   /** 誕生日の当日にLINEでお祝いを送る */
   birthdayGreetingEnabled: boolean;
   /** お祝いの文。{name} がお名前に置き換わる */
@@ -225,6 +227,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   promoImageKey: "",
   promoLastSentDate: "",
   ownerLineUserIds: [],
+  ownerLoginId: "admin",
   birthdayGreetingEnabled: false,
   birthdayMessage: "{name}様、お誕生日おめでとうございます🎂\n素敵な1年になりますように。今月ご来店の際は、お祝いに1杯サービスいたします🥂",
 };
@@ -246,6 +249,8 @@ export interface Staff {
   pending: boolean;
   /** LINEでログインするためのLINEユーザーID（LINEログインで確認したもの） */
   lineUserId: string | null;
+  /** IDとパスワードでログインするときのID（小文字の英数字。重複なし） */
+  loginId: string | null;
   createdAt: string;
 }
 

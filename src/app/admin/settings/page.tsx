@@ -4,7 +4,14 @@ import { LineLoginButton } from "../../login/line-button";
 import { weekdayJa } from "@/lib/domain/time";
 import { THEMES } from "@/lib/domain/theme";
 import { listCalendars } from "@/lib/integrations/google-calendar";
-import { disconnectGoogleAction, pullCalendarAction, saveCalendarAction, saveSettingsAction, unlinkOwnerLineAction } from "../actions";
+import {
+  disconnectGoogleAction,
+  pullCalendarAction,
+  saveCalendarAction,
+  saveOwnerLoginIdAction,
+  saveSettingsAction,
+  unlinkOwnerLineAction,
+} from "../actions";
 
 const SHOP_TYPES = ["バー", "ダーツバー", "スナック", "ガールズバー", "コンセプトカフェ", "ラウンジ", "居酒屋", "カラオケバー"];
 const EMPTY_AREAS = Array.from({ length: 3 }, () => ({ name: "", seats: 0 }));
@@ -54,7 +61,14 @@ export default async function SettingsPage({
       {line === "staff_conflict" && <p className="notice error">このLINEはスタッフとして登録されています。オーナー用には別のLINEアカウントを使ってください。</p>}
 
       <section className="card">
-        <h2 style={{ marginTop: 0 }}>オーナーのLINEログイン</h2>
+        <h2 style={{ marginTop: 0 }}>オーナーのログイン</h2>
+        <form action={saveOwnerLoginIdAction} className="row" style={{ alignItems: "flex-end" }}>
+          <label style={{ flex: 1, marginBottom: 0 }}>
+            ログインID（パスワードは環境変数 ADMIN_PASSWORD）
+            <input name="ownerLoginId" required defaultValue={s.ownerLoginId || "admin"} autoCapitalize="none" spellCheck={false} maxLength={30} />
+          </label>
+          <button type="submit">IDを保存</button>
+        </form>
         <p className="muted">
           連携すると、オーナーのログイン画面（{base}/owner/login）で「LINEでログイン」できます。スタッフは {base}/login からログインします。
         </p>

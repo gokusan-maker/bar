@@ -23,6 +23,7 @@ const TABLES: [string, string, string?][] = [
   ["orders", "20261028000000_orders.sql"],
   ["customers", "20261029000000_customer_profile.sql", "tags"],
   ["staff", "20261031000000_staff_line_login.sql", "line_user_id"],
+  ["staff", "20261101000000_staff_login_id.sql", "login_id"],
 ];
 
 /** よくある失敗を、店主にわかる言葉にする */
