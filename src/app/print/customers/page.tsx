@@ -24,6 +24,7 @@ export default async function CustomersPrintPage({ searchParams }: { searchParam
     p.staff && (p.staff === "none" ? "担当なし" : `担当 ${staffName.get(p.staff) ?? ""}`),
     p.tag && `タグ ${p.tag}`,
     p.bday && `${Number(p.bday)}月生まれ`,
+    p.away && `${p.away}日以上来ていない`,
   ].filter(Boolean);
 
   return (

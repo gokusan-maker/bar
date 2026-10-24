@@ -50,3 +50,19 @@ describe("customer profile helpers", () => {
     expect(phoneLabel("0312345678")).toBe("03-1234-5678");
   });
 });
+
+describe("filterCustomers", () => {
+  it("filters by tag, birthday month and lapsed visits", async () => {
+    const { filterCustomers } = await import("./customers");
+    const row = (id: string, over: Partial<Customer>, lastVisit: string | null) => ({ customer: { ...customer(id), ...over }, lastVisit });
+    const rows = [
+      row("a", { tags: ["VIP"], birthday: "10-30" }, "2026-06-01"),
+      row("b", { tags: [] , birthday: "05-03" }, "2026-10-20"),
+      row("c", {}, null),
+    ];
+    expect(filterCustomers(rows, { tag: "VIP" }).map((r) => r.customer.id)).toEqual(["a"]);
+    expect(filterCustomers(rows, { birthdayMonth: "05" }).map((r) => r.customer.id)).toEqual(["b"]);
+    // 来店したことのないお客様は「ご無沙汰」に含めない
+    expect(filterCustomers(rows, { lastVisitBefore: "2026-08-25" }).map((r) => r.customer.id)).toEqual(["a"]);
+  });
+});

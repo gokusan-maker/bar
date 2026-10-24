@@ -1,6 +1,7 @@
 import "server-only";
 import { repository } from "./container";
 import { filterCustomers, summarizeCustomers, type CustomerSummary } from "./domain/customers";
+import { addDays, toJst } from "./domain/time";
 import { businessDateOf } from "./reservation-service";
 
 export const CUSTOMER_SORTS: Record<string, { label: string; compare: (a: CustomerSummary, b: CustomerSummary) => number }> = {
@@ -11,7 +12,17 @@ export const CUSTOMER_SORTS: Record<string, { label: string; compare: (a: Custom
   birthday: { label: "誕生日順", compare: (a, b) => (a.customer.birthday ?? "99").localeCompare(b.customer.birthday ?? "99") },
 };
 
-export type CustomerListParams = { q?: string; sort?: string; channel?: string; staff?: string; tag?: string; bday?: string; saved?: string };
+export type CustomerListParams = {
+  q?: string;
+  sort?: string;
+  channel?: string;
+  staff?: string;
+  tag?: string;
+  bday?: string;
+  /** 最終来店からの日数（30・60・90） */
+  away?: string;
+  saved?: string;
+};
 
 /** お客様リストの絞り込み（印刷ページと共通） */
 export async function customerList(p: CustomerListParams) {
@@ -32,7 +43,11 @@ export async function customerList(p: CustomerListParams) {
     (r) => businessDateOf(r, settings),
     new Date(),
   );
-  const rows = filterCustomers(all, { channel: p.channel, staffId: p.staff, tag: p.tag, birthdayMonth: p.bday }).sort(order.compare);
+  const awayDays = Number(p.away);
+  const lastVisitBefore = [30, 60, 90].includes(awayDays) ? addDays(toJst(new Date()).date, -awayDays) : undefined;
+  const rows = filterCustomers(all, { channel: p.channel, staffId: p.staff, tag: p.tag, birthdayMonth: p.bday, lastVisitBefore }).sort(
+    order.compare,
+  );
   const tags = [...new Set(all.flatMap((r) => r.customer.tags))].sort((a, b) => a.localeCompare(b, "ja"));
   return { rows, total: all.length, tags, staff, settings };
 }

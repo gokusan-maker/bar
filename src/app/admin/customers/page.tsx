@@ -63,6 +63,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               ))}
             </select>
           )}
+          <select name="away" defaultValue={p.away ?? ""} aria-label="最終来店" style={{ flex: 1, minWidth: 120 }}>
+            <option value="">最終来店：すべて</option>
+            <option value="30">30日以上来ていない</option>
+            <option value="60">60日以上来ていない</option>
+            <option value="90">90日以上来ていない</option>
+          </select>
           <select name="bday" defaultValue={p.bday ?? ""} aria-label="誕生月" style={{ flex: 1, minWidth: 120 }}>
             <option value="">誕生月：すべて</option>
             {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map((m) => (
@@ -78,6 +84,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           </button>
           <Link className="button" href={`/admin/customers?bday=${thisMonth}&sort=birthday`}>
             今月が誕生日
+          </Link>
+          <Link className="button" href="/admin/customers?away=60&sort=visits">
+            ご無沙汰の常連
           </Link>
           <Link className="button" href="/admin/customers">
             条件をクリア

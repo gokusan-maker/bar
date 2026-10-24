@@ -98,11 +98,14 @@ export interface CustomerFilter {
   tag?: string;
   /** "01"〜"12"。その月が誕生日のお客様 */
   birthdayMonth?: string;
+  /** 来店したことがあり、最終来店がこの日より前（"YYYY-MM-DD"）のお客様 */
+  lastVisitBefore?: string;
 }
 
-export function filterCustomers<T extends { customer: Customer }>(rows: T[], f: CustomerFilter): T[] {
+export function filterCustomers<T extends { customer: Customer; lastVisit: string | null }>(rows: T[], f: CustomerFilter): T[] {
   return rows.filter(
-    ({ customer: c }) =>
+    ({ customer: c, lastVisit }) =>
+      (!f.lastVisitBefore || (!!lastVisit && lastVisit < f.lastVisitBefore)) &&
       (!f.channel || c.channel === f.channel) &&
       (!f.staffId || (f.staffId === "none" ? !c.staffId : c.staffId === f.staffId)) &&
       (!f.tag || c.tags.includes(f.tag)) &&
