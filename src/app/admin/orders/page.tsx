@@ -6,6 +6,7 @@ import type { Order } from "@/lib/domain/types";
 import { businessDayStart } from "@/lib/order-service";
 import { AutoRefresh } from "../auto-refresh";
 import { setOrderStatusAction } from "../order-actions";
+import { NewOrderAlert } from "./new-order-alert";
 
 const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
@@ -50,6 +51,7 @@ export default async function OrdersPage() {
       </div>
       {!settings.orderingEnabled && <p className="notice">注文の受付を止めています（メニュー・QRコードの画面で再開できます）。</p>}
       <p className="muted">15秒ごとに自動で更新します。</p>
+      <NewOrderAlert waiting={waiting.length} />
 
       <section className="card">
         <h2 style={{ marginTop: 0 }}>未提供 {waiting.length}件</h2>
