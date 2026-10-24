@@ -1,5 +1,10 @@
 import type {
   Attachment,
+  MenuItem,
+  Order,
+  OrderLine,
+  OrderStatus,
+  OrderTable,
   AuditLog,
   Channel,
   Customer,
@@ -58,6 +63,14 @@ export interface ReservationQuery {
 /** ログイン関係は省略するとログインなし */
 export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending"> &
   Partial<Pick<Staff, "passwordHash" | "pending">>;
+
+export interface OrderQuery {
+  /** この時刻以降に作られた注文 */
+  since?: Date;
+  tableId?: string;
+  status?: OrderStatus;
+  limit?: number;
+}
 
 export interface Repository {
   getSettings(): Promise<ShopSettings>;
@@ -122,6 +135,23 @@ export interface Repository {
 
   /** cutoff より古い個人情報を削除・匿名化する（売上の金額・証拠は残す） */
   purgePersonalData(cutoff: Date): Promise<PurgeResult>;
+
+  /** 並び順（sortOrder・作成順） */
+  listMenu(): Promise<MenuItem[]>;
+  createMenuItem(input: Omit<MenuItem, "id" | "createdAt">): Promise<MenuItem>;
+  updateMenuItem(id: string, patch: Partial<Omit<MenuItem, "id" | "createdAt">>): Promise<MenuItem>;
+  deleteMenuItem(id: string): Promise<void>;
+
+  listOrderTables(): Promise<OrderTable[]>;
+  getOrderTableByToken(token: string): Promise<OrderTable | null>;
+  createOrderTable(input: Omit<OrderTable, "id" | "createdAt">): Promise<OrderTable>;
+  updateOrderTable(id: string, patch: Partial<Omit<OrderTable, "id" | "createdAt">>): Promise<OrderTable>;
+
+  createOrder(input: { tableId: string; tableName: string; lines: OrderLine[]; total: number; note: string | null }): Promise<Order>;
+  getOrder(id: string): Promise<Order | null>;
+  /** 新しい順 */
+  listOrders(query: OrderQuery): Promise<Order[]>;
+  updateOrder(id: string, patch: Partial<Pick<Order, "status" | "saleId">>): Promise<Order>;
 
   addAudit(entry: Omit<AuditLog, "id" | "createdAt">): Promise<void>;
   /** 新しい順 */

@@ -22,10 +22,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="nav-inner">
           <strong>予約管理{owner ? "" : `（${staffName ?? "スタッフ"}）`}</strong>
           <Link href="/admin">予約一覧</Link>
+          <Link href="/admin/orders">注文</Link>
           {owner && (
             <>
               <Link href="/admin/new">手動登録</Link>
               <Link href="/admin/post">空き投稿</Link>
+              <Link href="/admin/menu">メニュー</Link>
               <Link href="/admin/sales">売上・バック</Link>
               <Link href="/admin/customers">お客様</Link>
               <Link href="/admin/inbox">メッセージ</Link>

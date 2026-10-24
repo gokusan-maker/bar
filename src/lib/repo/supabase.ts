@@ -14,6 +14,9 @@ import {
   type Reservation,
   type Sale,
   type ShopSettings,
+  type MenuItem,
+  type Order,
+  type OrderTable,
   type Staff,
 } from "../domain/types";
 import type {
@@ -26,6 +29,7 @@ import type {
   SalePatch,
   SaleQuery,
   NewStaff,
+  OrderQuery,
 } from "./types";
 
 /** 1つのSupabaseプロジェクトに他のアプリと同居させるため、表は bar スキーマ、写真は bar-evidence バケットに置く */
@@ -62,6 +66,37 @@ const toStaff = (r: any): Staff => ({
   passwordHash: r.password_hash ?? null,
   pending: r.pending ?? false,
   createdAt: r.created_at,
+});
+
+const toMenuItem = (r: any): MenuItem => ({
+  id: r.id,
+  name: r.name,
+  category: r.category,
+  price: r.price,
+  available: r.available,
+  sortOrder: r.sort_order,
+  createdAt: r.created_at,
+});
+
+const toOrderTable = (r: any): OrderTable => ({
+  id: r.id,
+  name: r.name,
+  token: r.token,
+  active: r.active,
+  createdAt: r.created_at,
+});
+
+const toOrder = (r: any): Order => ({
+  id: r.id,
+  tableId: r.table_id,
+  tableName: r.table_name,
+  lines: r.lines ?? [],
+  total: r.total,
+  note: r.note,
+  status: r.status,
+  saleId: r.sale_id,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
 });
 
 const toSale = (r: any): Sale => ({
@@ -503,6 +538,83 @@ export class SupabaseRepository implements Repository {
 
   async purgePersonalData(cutoff: Date): Promise<PurgeResult> {
     return check(await this.db.rpc("purge_personal_data", { cutoff: cutoff.toISOString() })) as PurgeResult;
+  }
+
+  async listMenu() {
+    const rows = check(await this.db.from("menu_items").select().order("sort_order").order("created_at"));
+    return (rows as any[]).map(toMenuItem);
+  }
+  async createMenuItem(input: Omit<MenuItem, "id" | "createdAt">) {
+    const row = check(
+      await this.db
+        .from("menu_items")
+        .insert({ name: input.name, category: input.category, price: input.price, available: input.available, sort_order: input.sortOrder })
+        .select()
+        .single(),
+    );
+    return toMenuItem(row);
+  }
+  async updateMenuItem(id: string, patch: Partial<Omit<MenuItem, "id" | "createdAt">>) {
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.category !== undefined) row.category = patch.category;
+    if (patch.price !== undefined) row.price = patch.price;
+    if (patch.available !== undefined) row.available = patch.available;
+    if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+    return toMenuItem(check(await this.db.from("menu_items").update(row).eq("id", id).select().single()));
+  }
+  async deleteMenuItem(id: string) {
+    check(await this.db.from("menu_items").delete().eq("id", id));
+  }
+
+  async listOrderTables() {
+    const rows = check(await this.db.from("order_tables").select().order("created_at"));
+    return (rows as any[]).map(toOrderTable);
+  }
+  async getOrderTableByToken(token: string) {
+    const row = check(await this.db.from("order_tables").select().eq("token", token).maybeSingle());
+    return row ? toOrderTable(row) : null;
+  }
+  async createOrderTable(input: Omit<OrderTable, "id" | "createdAt">) {
+    const row = check(
+      await this.db.from("order_tables").insert({ name: input.name, token: input.token, active: input.active }).select().single(),
+    );
+    return toOrderTable(row);
+  }
+  async updateOrderTable(id: string, patch: Partial<Omit<OrderTable, "id" | "createdAt">>) {
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.token !== undefined) row.token = patch.token;
+    if (patch.active !== undefined) row.active = patch.active;
+    return toOrderTable(check(await this.db.from("order_tables").update(row).eq("id", id).select().single()));
+  }
+
+  async createOrder(input: { tableId: string; tableName: string; lines: Order["lines"]; total: number; note: string | null }) {
+    const row = check(
+      await this.db
+        .from("orders")
+        .insert({ table_id: input.tableId, table_name: input.tableName, lines: input.lines, total: input.total, note: input.note })
+        .select()
+        .single(),
+    );
+    return toOrder(row);
+  }
+  async getOrder(id: string) {
+    const row = check(await this.db.from("orders").select().eq("id", id).maybeSingle());
+    return row ? toOrder(row) : null;
+  }
+  async listOrders(query: OrderQuery) {
+    let q = this.db.from("orders").select().order("created_at", { ascending: false }).limit(query.limit ?? 500);
+    if (query.since) q = q.gte("created_at", query.since.toISOString());
+    if (query.tableId) q = q.eq("table_id", query.tableId);
+    if (query.status) q = q.eq("status", query.status);
+    return (check(await q) as any[]).map(toOrder);
+  }
+  async updateOrder(id: string, patch: Partial<Pick<Order, "status" | "saleId">>) {
+    const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (patch.status !== undefined) row.status = patch.status;
+    if (patch.saleId !== undefined) row.sale_id = patch.saleId;
+    return toOrder(check(await this.db.from("orders").update(row).eq("id", id).select().single()));
   }
 
   async addAudit(entry: Omit<AuditLog, "id" | "createdAt">) {

@@ -71,6 +71,7 @@ export async function saveSaleAction(formData: FormData) {
     go(id ? `/admin/sales/${id}` : "/admin/sales/new", {
       error: result.error,
       ...(input.reservationId ? { reservationId: input.reservationId } : {}),
+      ...(str(formData, "orderIds") ? { orders: str(formData, "orderIds") } : {}),
     });
   }
   await audit(
@@ -79,6 +80,14 @@ export async function saveSaleAction(formData: FormData) {
     result.value.id,
     `${result.value.businessDate} ${result.value.customerName ?? ""} 合計${saleTotal(result.value)}円`,
   );
+  // QRコード注文の会計から登録した場合、注文に売上を結びつける（二重に取り込まないように）
+  if (!id) {
+    const repo = repository();
+    for (const orderId of str(formData, "orderIds").split(",").filter(Boolean).slice(0, 100)) {
+      const order = await repo.getOrder(orderId);
+      if (order && !order.saleId && order.status !== "cancelled") await repo.updateOrder(orderId, { saleId: result.value.id });
+    }
+  }
   const errors = await saveFiles(result.value.id, filesFrom(formData));
   go(`/admin/sales/${result.value.id}`, errors.length ? { error: errors.join(" / ") } : { saved: "1" });
 }

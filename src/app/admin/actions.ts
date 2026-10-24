@@ -146,6 +146,8 @@ export async function saveSettingsAction(formData: FormData) {
       : "",
     // 招待リンクはスタッフの画面で作る・止める
     staffInviteCode: current.staffInviteCode,
+    // 注文の受付はメニューの画面で切り替える
+    orderingEnabled: current.orderingEnabled,
   };
   await repo.saveSettings(settings);
   await recordAudit({ actor: "owner", action: "設定を変更", targetType: "settings", targetId: null, detail: null });

@@ -20,6 +20,7 @@ const TABLES: [string, string, string?][] = [
   ["login_failures", "20261023000000_privacy.sql"],
   ["web_requests", "20261024000000_web_booking.sql"],
   ["staff", "20261027000000_staff_login.sql", "password_hash"],
+  ["orders", "20261028000000_orders.sql"],
 ];
 
 /** よくある失敗を、店主にわかる言葉にする */

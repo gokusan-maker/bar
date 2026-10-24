@@ -9,6 +9,7 @@ const ICONS: Record<string, React.ReactNode> = {
   people: (
     <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2.5 20c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5M16 4.3a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.7.8 2.8 2.6 3 5.2" />
   ),
+  glass: <path d="M6 3h12l-1.5 7a4.5 4.5 0 0 1-9 0L6 3ZM12 14.5V20M8.5 20h7M6.6 6h10.8" />,
   chat: <path d="M4 5h16v11H9l-5 4V5Z" />,
   gear: (
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2.1 1.2L14.7 21h-4l-.3-2.4a7 7 0 0 1-2.1-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.4L4.4 9.9l2-3.4 1.9.7a7 7 0 0 1 2.1-1.2L10.7 3h4l.3 2.4a7 7 0 0 1 2.1 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.4Z" />
@@ -17,6 +18,7 @@ const ICONS: Record<string, React.ReactNode> = {
 
 const OWNER_TABS = [
   { href: "/admin", label: "予約", icon: "calendar", match: ["/admin", "/admin/reservations", "/admin/new", "/admin/post"] },
+  { href: "/admin/orders", label: "注文", icon: "glass", match: ["/admin/orders", "/admin/menu"] },
   { href: "/admin/sales", label: "売上", icon: "yen", match: ["/admin/sales", "/admin/staff"] },
   { href: "/admin/customers", label: "お客様", icon: "people", match: ["/admin/customers"] },
   { href: "/admin/inbox", label: "メッセージ", icon: "chat", match: ["/admin/inbox", "/admin/simulator"] },

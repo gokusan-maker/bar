@@ -11,6 +11,9 @@ import {
   type Reservation,
   type Sale,
   type ShopSettings,
+  type MenuItem,
+  type Order,
+  type OrderTable,
   type Staff,
 } from "../domain/types";
 import type {
@@ -23,6 +26,7 @@ import type {
   SalePatch,
   SaleQuery,
   NewStaff,
+  OrderQuery,
 } from "./types";
 
 /**
@@ -41,6 +45,9 @@ export class MemoryRepository implements Repository {
   private audit: AuditLog[] = [];
   private loginFailures: { ip: string; at: string }[] = [];
   private webRequests: { ip: string; at: string }[] = [];
+  private menu = new Map<string, MenuItem>();
+  private orderTables = new Map<string, OrderTable>();
+  private orders = new Map<string, Order>();
   /** 同一ミリ秒でも作成順が決まるように使う */
   private seq = 0;
 
@@ -304,6 +311,74 @@ export class MemoryRepository implements Repository {
       }
     }
     return { messages: before - this.messages.length, reservations, sales, customers };
+  }
+
+  async listMenu() {
+    return [...this.menu.values()]
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt))
+      .map((m) => ({ ...m }));
+  }
+  async createMenuItem(input: Omit<MenuItem, "id" | "createdAt">) {
+    const m: MenuItem = { ...input, id: randomUUID(), createdAt: this.stamp() };
+    this.menu.set(m.id, m);
+    return { ...m };
+  }
+  async updateMenuItem(id: string, patch: Partial<Omit<MenuItem, "id" | "createdAt">>) {
+    const m = this.menu.get(id);
+    if (!m) throw new Error(`menu item not found: ${id}`);
+    Object.assign(m, patch);
+    return { ...m };
+  }
+  async deleteMenuItem(id: string) {
+    this.menu.delete(id);
+  }
+
+  async listOrderTables() {
+    return [...this.orderTables.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((t) => ({ ...t }));
+  }
+  async getOrderTableByToken(token: string) {
+    const t = [...this.orderTables.values()].find((x) => x.token === token);
+    return t ? { ...t } : null;
+  }
+  async createOrderTable(input: Omit<OrderTable, "id" | "createdAt">) {
+    const t: OrderTable = { ...input, id: randomUUID(), createdAt: this.stamp() };
+    this.orderTables.set(t.id, t);
+    return { ...t };
+  }
+  async updateOrderTable(id: string, patch: Partial<Omit<OrderTable, "id" | "createdAt">>) {
+    const t = this.orderTables.get(id);
+    if (!t) throw new Error(`table not found: ${id}`);
+    Object.assign(t, patch);
+    return { ...t };
+  }
+
+  async createOrder(input: { tableId: string; tableName: string; lines: Order["lines"]; total: number; note: string | null }) {
+    const at = this.stamp();
+    const o: Order = { ...input, lines: input.lines.map((l) => ({ ...l })), status: "new", saleId: null, id: randomUUID(), createdAt: at, updatedAt: at };
+    this.orders.set(o.id, o);
+    return structuredClone(o);
+  }
+  async getOrder(id: string) {
+    const o = this.orders.get(id);
+    return o ? structuredClone(o) : null;
+  }
+  async listOrders(query: OrderQuery) {
+    return [...this.orders.values()]
+      .filter(
+        (o) =>
+          (!query.since || o.createdAt >= query.since.toISOString()) &&
+          (!query.tableId || o.tableId === query.tableId) &&
+          (!query.status || o.status === query.status),
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, query.limit ?? 500)
+      .map((o) => structuredClone(o));
+  }
+  async updateOrder(id: string, patch: Partial<Pick<Order, "status" | "saleId">>) {
+    const o = this.orders.get(id);
+    if (!o) throw new Error(`order not found: ${id}`);
+    Object.assign(o, patch, { updatedAt: this.stamp() });
+    return structuredClone(o);
   }
 
   async addAudit(entry: Omit<AuditLog, "id" | "createdAt">) {
