@@ -12,7 +12,10 @@ export function SaleForm({
   settings,
   withFiles,
   customers = [],
+  orderIds = [],
 }: {
+  /** 売上に取り込む注文（QRコード注文の会計） */
+  orderIds?: string[];
   /** 予約なしの新規登録で選べる既存のお客様 */
   customers?: Customer[];
   id?: string;
@@ -27,6 +30,7 @@ export function SaleForm({
     <form action={saveSaleAction} className="card">
       {id && <input type="hidden" name="id" value={id} />}
       <input type="hidden" name="reservationId" value={values.reservationId ?? ""} />
+      {orderIds.length > 0 && <input type="hidden" name="orderIds" value={orderIds.join(",")} />}
       {customers.length > 0 && !id && !fromReservation ? (
         <label>
           既存のお客様（選ぶと来店履歴に記録され、担当スタッフも引き継ぎます）

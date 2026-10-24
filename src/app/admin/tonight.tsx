@@ -11,7 +11,10 @@ export function Tonight({
   board,
   pendingCount,
   owner,
+  orders,
 }: {
+  /** 今夜のQRコード注文（未提供の件数と合計金額） */
+  orders: { waiting: number; total: number };
   date: string;
   settings: ShopSettings;
   reservations: Reservation[];
@@ -52,7 +55,7 @@ export function Tonight({
               <strong>{active.length + arrived.length}組</strong>
             </div>
             <div className="tile">
-              <span className="muted">来店予定</span>
+              <span className="muted">人数</span>
               <strong>{guests}名</strong>
             </div>
             <div className="tile">
@@ -60,8 +63,13 @@ export function Tonight({
               <strong>{arrived.length}組</strong>
             </div>
             <Link className={`tile ${pendingCount ? "tile-alert" : ""}`} href="/admin#pending">
-              <span className="muted">承認待ち</span>
+              <span className="muted">承認待</span>
               <strong>{pendingCount}件</strong>
+            </Link>
+            <Link className={`tile ${orders.waiting ? "tile-alert" : ""}`} href="/admin/orders">
+              <span className="muted">注文待</span>
+              <strong>{orders.waiting}件</strong>
+              {owner && orders.total > 0 && <span className="muted">計 ¥{orders.total.toLocaleString("ja-JP")}</span>}
             </Link>
           </div>
           {board.length > 0 && (
