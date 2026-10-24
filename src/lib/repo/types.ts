@@ -64,6 +64,8 @@ export interface ReservationQuery {
 export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending"> &
   Partial<Pick<Staff, "passwordHash" | "pending">>;
 
+export type CustomerPatch = Partial<Pick<Customer, "name" | "note" | "displayName" | "staffId" | "phone" | "birthday" | "tags">>;
+
 export interface OrderQuery {
   /** この時刻以降に作られた注文 */
   since?: Date;
@@ -86,11 +88,11 @@ export interface Repository {
   ): Promise<Customer>;
   getCustomer(id: string): Promise<Customer | null>;
   /** 名前・表示名で検索（新しい順）。search が空なら全件 */
+  /** search は名前・表示名・電話番号の部分一致 */
   listCustomers(query: { search?: string; limit: number }): Promise<Customer[]>;
-  updateCustomer(
-    id: string,
-    patch: Partial<Pick<Customer, "name" | "note" | "displayName" | "staffId">>,
-  ): Promise<void>;
+  /** 店で直接登録するお客様（SNSのIDなし） */
+  createCustomer(input: Pick<Customer, "channel" | "name" | "phone" | "birthday" | "tags" | "note" | "staffId">): Promise<Customer>;
+  updateCustomer(id: string, patch: CustomerPatch): Promise<void>;
 
   addMessage(entry: Omit<MessageLog, "id" | "createdAt">): Promise<MessageLog>;
   /** 新しい順ではなく古い順で返す */

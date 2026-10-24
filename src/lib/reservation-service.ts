@@ -680,7 +680,7 @@ export class ReservationService {
     // 同じ電話番号のお客様は同じ人として扱う
     const channel = input.source === "x" ? "x" : "web";
     const customer = await this.repo.findOrCreateCustomer(channel, phone, name);
-    if (customer.name !== name) await this.repo.updateCustomer(customer.id, { name });
+    if (customer.name !== name || customer.phone !== phone) await this.repo.updateCustomer(customer.id, { name, phone });
     const end = availability.ok ? availability.end : new Date(start.getTime() + settings.stayMinutes * 60_000);
     let reservation = await this.repo.createReservation({
       customerId: customer.id,

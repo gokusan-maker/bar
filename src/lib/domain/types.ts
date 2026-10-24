@@ -44,6 +44,12 @@ export interface Customer {
   note: string | null;
   /** 担当スタッフ（バックの計算先） */
   staffId: string | null;
+  /** 電話番号（数字のみ） */
+  phone: string | null;
+  /** 誕生日 "MM-DD"（年は持たない） */
+  birthday: string | null;
+  /** 自由なタグ（常連、VIP、ワイン好き など） */
+  tags: string[];
   createdAt: string;
 }
 

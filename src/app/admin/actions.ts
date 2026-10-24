@@ -189,13 +189,6 @@ export async function manualReplyAction(formData: FormData) {
   back(`/admin/customers/${customerId}`);
 }
 
-export async function saveCustomerNoteAction(formData: FormData) {
-  await requireAdmin();
-  const customerId = str(formData, "customerId");
-  await repository().updateCustomer(customerId, { note: str(formData, "note") || null });
-  back(`/admin/customers/${customerId}`, { saved: "1" });
-}
-
 export async function simulatorSendAction(formData: FormData) {
   await requireAdmin();
   const userId = str(formData, "userId") || "guest-1";

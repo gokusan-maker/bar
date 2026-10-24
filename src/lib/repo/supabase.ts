@@ -28,6 +28,7 @@ import type {
   ReservationQuery,
   SalePatch,
   SaleQuery,
+  CustomerPatch,
   NewStaff,
   OrderQuery,
 } from "./types";
@@ -51,6 +52,9 @@ const toCustomer = (r: any): Customer => ({
   name: r.name,
   note: r.note,
   staffId: r.staff_id ?? null,
+  phone: r.phone ?? null,
+  birthday: r.birthday ?? null,
+  tags: r.tags ?? [],
   createdAt: r.created_at,
 });
 
@@ -286,18 +290,41 @@ export class SupabaseRepository implements Repository {
     let query = this.db.from("customers").select().order("created_at", { ascending: false }).limit(q.limit);
     // PostgRESTの or() 構文を壊す文字は取り除く
     const term = q.search?.replace(/[,()%*\\]/g, "").trim();
-    if (term) query = query.or(`name.ilike.%${term}%,display_name.ilike.%${term}%`);
+    const digits = term?.replace(/\D/g, "");
+    if (term) {
+      query = query.or(
+        [`name.ilike.%${term}%`, `display_name.ilike.%${term}%`, ...(digits && digits.length >= 3 ? [`phone.ilike.%${digits}%`] : [])].join(","),
+      );
+    }
     return (check(await query) as any[]).map(toCustomer);
   }
-  async updateCustomer(
-    id: string,
-    patch: Partial<Pick<Customer, "name" | "note" | "displayName" | "staffId">>,
-  ) {
+  async createCustomer(input: Pick<Customer, "channel" | "name" | "phone" | "birthday" | "tags" | "note" | "staffId">) {
+    const row = check(
+      await this.db
+        .from("customers")
+        .insert({
+          channel: input.channel,
+          name: input.name,
+          phone: input.phone,
+          birthday: input.birthday,
+          tags: input.tags,
+          note: input.note,
+          staff_id: input.staffId,
+        })
+        .select()
+        .single(),
+    );
+    return toCustomer(row);
+  }
+  async updateCustomer(id: string, patch: CustomerPatch) {
     const row: Record<string, unknown> = {};
     if (patch.staffId !== undefined) row.staff_id = patch.staffId;
     if (patch.name !== undefined) row.name = patch.name;
     if (patch.note !== undefined) row.note = patch.note;
     if (patch.displayName !== undefined) row.display_name = patch.displayName;
+    if (patch.phone !== undefined) row.phone = patch.phone;
+    if (patch.birthday !== undefined) row.birthday = patch.birthday;
+    if (patch.tags !== undefined) row.tags = patch.tags;
     check(await this.db.from("customers").update(row).eq("id", id));
   }
 

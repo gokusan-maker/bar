@@ -25,6 +25,7 @@ import type {
   ReservationQuery,
   SalePatch,
   SaleQuery,
+  CustomerPatch,
   NewStaff,
   OrderQuery,
 } from "./types";
@@ -90,6 +91,9 @@ export class MemoryRepository implements Repository {
       name: null,
       note: null,
       staffId: null,
+      phone: null,
+      birthday: null,
+      tags: [],
       createdAt: this.stamp(),
     };
     this.customers.set(customer.id, customer);
@@ -101,16 +105,25 @@ export class MemoryRepository implements Repository {
   }
   async listCustomers(q: { search?: string; limit: number }) {
     const term = q.search?.trim();
+    const digits = term?.replace(/\D/g, "");
     return [...this.customers.values()]
-      .filter((c) => !term || c.name?.includes(term) || c.displayName?.includes(term))
+      .filter(
+        (c) =>
+          !term ||
+          c.name?.includes(term) ||
+          c.displayName?.includes(term) ||
+          (!!digits && digits.length >= 3 && !!c.phone?.includes(digits)),
+      )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, q.limit)
-      .map((c) => ({ ...c }));
+      .map((c) => ({ ...c, tags: [...c.tags] }));
   }
-  async updateCustomer(
-    id: string,
-    patch: Partial<Pick<Customer, "name" | "note" | "displayName" | "staffId">>,
-  ) {
+  async createCustomer(input: Pick<Customer, "channel" | "name" | "phone" | "birthday" | "tags" | "note" | "staffId">) {
+    const customer: Customer = { ...input, tags: [...input.tags], id: randomUUID(), externalId: null, displayName: null, createdAt: this.stamp() };
+    this.customers.set(customer.id, customer);
+    return { ...customer, tags: [...customer.tags] };
+  }
+  async updateCustomer(id: string, patch: CustomerPatch) {
     const c = this.customers.get(id);
     if (c) Object.assign(c, patch);
   }
@@ -302,12 +315,13 @@ export class MemoryRepository implements Repository {
     }
     let customers = 0;
     for (const cu of this.customers.values()) {
-      const hasPersonal = cu.name || cu.displayName || cu.externalId || cu.note;
+      const hasPersonal = cu.name || cu.displayName || cu.externalId || cu.note || cu.phone || cu.birthday;
       const recent =
         [...this.reservations.values()].some((r) => r.customerId === cu.id && r.endAt >= c) ||
-        this.messages.some((m) => m.customerId === cu.id);
+        this.messages.some((m) => m.customerId === cu.id) ||
+        [...this.sales.values()].some((s) => s.customerId === cu.id && s.businessDate >= cutoffDate);
       if (cu.createdAt < c && hasPersonal && !recent) {
-        Object.assign(cu, { name: null, displayName: null, externalId: null, note: null });
+        Object.assign(cu, { name: null, displayName: null, externalId: null, note: null, phone: null, birthday: null, tags: [] });
         customers++;
       }
     }

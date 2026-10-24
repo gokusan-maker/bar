@@ -60,7 +60,7 @@ http://localhost:3000/admin/simulator を開き、「土曜の9時から2名で�
 
 ### 1. Supabase（データベース）
 1. https://supabase.com でプロジェクトを作成
-2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
+2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders → customer_profile）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
 3. Project Settings → Data API → **Exposed schemas に `bar` を追加**して保存（しないとアプリから表が見えません）
 4. Project Settings → API の URL と `service_role` キーを `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` に設定
 5. `TOKEN_ENCRYPTION_KEY` に長いランダム文字列を設定（例: `openssl rand -base64 32`）

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { recordAudit } from "@/lib/audit";
 import { isAdmin } from "@/lib/auth";
 import { repository } from "@/lib/container";
-import { summarizeCustomers } from "@/lib/domain/customers";
+import { birthdayLabel, phoneLabel, summarizeCustomers } from "@/lib/domain/customers";
 import { saleTotal, toCsv } from "@/lib/domain/sales";
 import { toJst } from "@/lib/domain/time";
 import { CHANNEL_LABEL, STATUS_LABEL } from "@/lib/domain/types";
@@ -57,9 +57,14 @@ export async function GET(req: Request) {
       new Date(),
     );
     csv = toCsv(
-      ["お名前", "SNSの表示名", "経路", "担当", "来店回数", "無断キャンセル", "最終来店", "利用金額", "メモ"],
+      ["お名前", "SNSの表示名", "電話番号", "誕生日", "タグ", "経路", "担当", "来店回数", "無断キャンセル", "最終来店", "利用金額", "メモ"],
       rows.map((r) => [
-        r.customer.name, r.customer.displayName, CHANNEL_LABEL[r.customer.channel], staffName(r.customer.staffId),
+        r.customer.name, r.customer.displayName,
+        // ハイフン付きにして、Excelで先頭の0が消えないようにする
+        r.customer.phone ? phoneLabel(r.customer.phone) : null,
+        r.customer.birthday ? birthdayLabel(r.customer.birthday) : null,
+        r.customer.tags.join("・"),
+        CHANNEL_LABEL[r.customer.channel], staffName(r.customer.staffId),
         r.visits, r.noShows, r.lastVisit, r.totalSpend, r.customer.note,
       ]),
     );
