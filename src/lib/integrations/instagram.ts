@@ -76,6 +76,37 @@ export class InstagramClient {
     }
   }
 
+  /**
+   * 画像付きでフィードに投稿する（instagram_business_content_publish 権限が必要）。
+   * 画像は Instagram のサーバーが imageUrl から取りに来るので、公開URLかつJPEGであること。
+   */
+  async publishPhoto(imageUrl: string, caption: string): Promise<string> {
+    const json = async (res: Response) => {
+      if (!res.ok) throw new Error(`Instagram ${res.status} ${await res.text()}`);
+      return res.json() as Promise<Record<string, string>>;
+    };
+    const auth = { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" };
+    const { user_id: igId } = await json(await fetch(`${this.apiBase}/me?fields=user_id`, { headers: auth }));
+    const { id: creationId } = await json(
+      await fetch(`${this.apiBase}/${igId}/media`, {
+        method: "POST",
+        headers: auth,
+        body: JSON.stringify({ image_url: imageUrl, caption: caption.slice(0, 2200) }),
+      }),
+    );
+    // 画像の取り込みが終わるのを少し待つ
+    for (let i = 0; i < 5; i++) {
+      const { status_code } = await json(await fetch(`${this.apiBase}/${creationId}?fields=status_code`, { headers: auth }));
+      if (status_code === "FINISHED") break;
+      if (status_code === "ERROR" || status_code === "EXPIRED") throw new Error(`Instagram media ${status_code}`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    const { id } = await json(
+      await fetch(`${this.apiBase}/${igId}/media_publish`, { method: "POST", headers: auth, body: JSON.stringify({ creation_id: creationId }) }),
+    );
+    return id;
+  }
+
   /** 接続確認用: 自分のアカウント名 */
   async me(): Promise<string> {
     const res = await fetch(`${this.apiBase}/me?fields=username`, {

@@ -154,6 +154,20 @@ export interface ShopSettings {
   staffInviteCode: string;
   /** QRコード・URLからのお酒の注文を受け付ける */
   orderingEnabled: boolean;
+  /** 空き状況をLINEの友だち全員に自動で配信する（集客） */
+  promoEnabled: boolean;
+  /** 配信する時刻（noon=12時、evening=17時） */
+  promoTime: "noon" | "evening";
+  /** 配信する曜日（0=日〜6=土） */
+  promoWeekdays: number[];
+  /** 配信の最初に入れるひとこと（おすすめ・イベントなど） */
+  promoMessage: string;
+  /** Instagramにも投稿する（画像が必要） */
+  promoInstagram: boolean;
+  /** Instagram投稿に使う画像（公開URL /promo-image/<key>）。空なら未設定 */
+  promoImageKey: string;
+  /** 最後に配信した営業日（同じ日に二重に送らないため） */
+  promoLastSentDate: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -189,6 +203,13 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   lineFriendUrl: "",
   staffInviteCode: "",
   orderingEnabled: true,
+  promoEnabled: false,
+  promoTime: "evening",
+  promoWeekdays: [0, 1, 2, 3, 4, 5, 6],
+  promoMessage: "",
+  promoInstagram: false,
+  promoImageKey: "",
+  promoLastSentDate: "",
 };
 
 /** 売上全体（お酒＋料金＋サービス料）に対するバック率（%）と、1組あたりの固定バック（円） */

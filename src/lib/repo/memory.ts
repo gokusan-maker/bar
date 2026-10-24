@@ -48,6 +48,7 @@ export class MemoryRepository implements Repository {
   private menu = new Map<string, MenuItem>();
   private orderTables = new Map<string, OrderTable>();
   private orders = new Map<string, Order>();
+  private promoImages = new Map<string, { data: Uint8Array; contentType: string }>();
   /** 同一ミリ秒でも作成順が決まるように使う */
   private seq = 0;
 
@@ -379,6 +380,13 @@ export class MemoryRepository implements Repository {
     if (!o) throw new Error(`order not found: ${id}`);
     Object.assign(o, patch, { updatedAt: this.stamp() });
     return structuredClone(o);
+  }
+
+  async savePromoImage(key: string, data: Uint8Array, contentType: string) {
+    this.promoImages.set(key, { data, contentType });
+  }
+  async getPromoImage(key: string) {
+    return this.promoImages.get(key) ?? null;
   }
 
   async addAudit(entry: Omit<AuditLog, "id" | "createdAt">) {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { reservationService } from "@/lib/container";
+import { promoService, reservationService } from "@/lib/container";
 
-/** 毎日12時に呼ばれる（wrangler.jsonc の cron → worker.ts）: 翌日のリマインドと、古い個人情報の削除 */
+/** 毎日12時に呼ばれる（wrangler.jsonc の cron → worker.ts）: 翌日のリマインド、古い個人情報の削除、12時設定の集客配信 */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -10,5 +10,6 @@ export async function GET(req: Request) {
   const service = reservationService();
   const sent = await service.sendReminders();
   const purged = await service.purgeExpiredPersonalData();
-  return NextResponse.json({ sent, purged });
+  const promo = await promoService().runScheduled("noon");
+  return NextResponse.json({ sent, purged, promo });
 }

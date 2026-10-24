@@ -617,6 +617,16 @@ export class SupabaseRepository implements Repository {
     return toOrder(check(await this.db.from("orders").update(row).eq("id", id).select().single()));
   }
 
+  async savePromoImage(key: string, data: Uint8Array, contentType: string) {
+    const { error } = await this.db.storage.from(BUCKET).upload(`promo/${key}`, data, { contentType, upsert: true });
+    if (error) throw new Error(`Supabase storage: ${error.message}`);
+  }
+  async getPromoImage(key: string) {
+    const { data, error } = await this.db.storage.from(BUCKET).download(`promo/${key}`);
+    if (error || !data) return null;
+    return { data: new Uint8Array(await data.arrayBuffer()), contentType: data.type || "image/jpeg" };
+  }
+
   async addAudit(entry: Omit<AuditLog, "id" | "createdAt">) {
     check(
       await this.db.from("audit_logs").insert({

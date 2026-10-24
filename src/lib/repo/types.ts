@@ -153,6 +153,10 @@ export interface Repository {
   listOrders(query: OrderQuery): Promise<Order[]>;
   updateOrder(id: string, patch: Partial<Pick<Order, "status" | "saleId">>): Promise<Order>;
 
+  /** 集客投稿の画像（Instagramが読みに来るので公開URLで配る） */
+  savePromoImage(key: string, data: Uint8Array, contentType: string): Promise<void>;
+  getPromoImage(key: string): Promise<{ data: Uint8Array; contentType: string } | null>;
+
   addAudit(entry: Omit<AuditLog, "id" | "createdAt">): Promise<void>;
   /** 新しい順 */
   listAudit(query: { targetId?: string; limit: number }): Promise<AuditLog[]>;
