@@ -10,6 +10,7 @@ import { MemoryRepository } from "./repo/memory";
 import { SupabaseRepository } from "./repo/supabase";
 import type { Repository } from "./repo/types";
 import { ReservationService } from "./reservation-service";
+import { PromoService } from "./promo-service";
 import { SalesService } from "./sales-service";
 
 const env = (name: string) => process.env[name]?.trim() || undefined;
@@ -80,7 +81,8 @@ function messenger(): Messenger {
   };
 }
 
-function notifier(): Notifier {
+/** 店主への通知（LINE）。OWNER_LINE_USER_ID がなければログに出すだけ */
+export function notifier(): Notifier {
   const line = lineClient();
   const owner = env("OWNER_LINE_USER_ID");
   return {
@@ -106,6 +108,18 @@ export function reservationService(): ReservationService {
     calendar: calendar(repo),
     messenger: messenger(),
     notifier: notifier(),
+  });
+}
+
+export function promoService(): PromoService {
+  const service = reservationService();
+  return new PromoService({
+    repo: repository(),
+    availabilityBoard: (date) => service.availabilityBoard(date),
+    line: lineClient(),
+    instagram: instagramClient(),
+    notify: (text) => notifier().notify(text),
+    baseUrl: appBaseUrl(),
   });
 }
 

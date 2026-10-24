@@ -14,6 +14,9 @@ import {
   type Reservation,
   type Sale,
   type ShopSettings,
+  type MenuItem,
+  type Order,
+  type OrderTable,
   type Staff,
 } from "../domain/types";
 import type {
@@ -25,6 +28,9 @@ import type {
   ReservationQuery,
   SalePatch,
   SaleQuery,
+  CustomerPatch,
+  NewStaff,
+  OrderQuery,
 } from "./types";
 
 /** 1つのSupabaseプロジェクトに他のアプリと同居させるため、表は bar スキーマ、写真は bar-evidence バケットに置く */
@@ -46,15 +52,56 @@ const toCustomer = (r: any): Customer => ({
   name: r.name,
   note: r.note,
   staffId: r.staff_id ?? null,
+  phone: r.phone ?? null,
+  birthday: r.birthday ?? null,
+  tags: r.tags ?? [],
+  birthdayGreetedYear: r.birthday_greeted_year ?? null,
   createdAt: r.created_at,
 });
 
 const toStaff = (r: any): Staff => ({
   id: r.id,
   name: r.name,
-  backRates: { drink: 0, charge: 0, service: 0, perVisit: 0, ...r.back_rates },
+  backRates: {
+    // 以前の項目別の率（お酒・料金・サービス料）で保存されたものは、お酒の率を全体の率として引き継ぐ
+    rate: Number(r.back_rates?.rate ?? r.back_rates?.drink ?? 0),
+    perVisit: Number(r.back_rates?.perVisit ?? 0),
+  },
+  active: r.active,
+  passwordHash: r.password_hash ?? null,
+  pending: r.pending ?? false,
+  createdAt: r.created_at,
+});
+
+const toMenuItem = (r: any): MenuItem => ({
+  id: r.id,
+  name: r.name,
+  category: r.category,
+  price: r.price,
+  available: r.available,
+  sortOrder: r.sort_order,
+  createdAt: r.created_at,
+});
+
+const toOrderTable = (r: any): OrderTable => ({
+  id: r.id,
+  name: r.name,
+  token: r.token,
   active: r.active,
   createdAt: r.created_at,
+});
+
+const toOrder = (r: any): Order => ({
+  id: r.id,
+  tableId: r.table_id,
+  tableName: r.table_name,
+  lines: r.lines ?? [],
+  total: r.total,
+  note: r.note,
+  status: r.status,
+  saleId: r.sale_id,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
 });
 
 const toSale = (r: any): Sale => ({
@@ -244,18 +291,42 @@ export class SupabaseRepository implements Repository {
     let query = this.db.from("customers").select().order("created_at", { ascending: false }).limit(q.limit);
     // PostgRESTの or() 構文を壊す文字は取り除く
     const term = q.search?.replace(/[,()%*\\]/g, "").trim();
-    if (term) query = query.or(`name.ilike.%${term}%,display_name.ilike.%${term}%`);
+    const digits = term?.replace(/\D/g, "");
+    if (term) {
+      query = query.or(
+        [`name.ilike.%${term}%`, `display_name.ilike.%${term}%`, ...(digits && digits.length >= 3 ? [`phone.ilike.%${digits}%`] : [])].join(","),
+      );
+    }
     return (check(await query) as any[]).map(toCustomer);
   }
-  async updateCustomer(
-    id: string,
-    patch: Partial<Pick<Customer, "name" | "note" | "displayName" | "staffId">>,
-  ) {
+  async createCustomer(input: Pick<Customer, "channel" | "name" | "phone" | "birthday" | "tags" | "note" | "staffId">) {
+    const row = check(
+      await this.db
+        .from("customers")
+        .insert({
+          channel: input.channel,
+          name: input.name,
+          phone: input.phone,
+          birthday: input.birthday,
+          tags: input.tags,
+          note: input.note,
+          staff_id: input.staffId,
+        })
+        .select()
+        .single(),
+    );
+    return toCustomer(row);
+  }
+  async updateCustomer(id: string, patch: CustomerPatch) {
     const row: Record<string, unknown> = {};
     if (patch.staffId !== undefined) row.staff_id = patch.staffId;
     if (patch.name !== undefined) row.name = patch.name;
     if (patch.note !== undefined) row.note = patch.note;
     if (patch.displayName !== undefined) row.display_name = patch.displayName;
+    if (patch.phone !== undefined) row.phone = patch.phone;
+    if (patch.birthday !== undefined) row.birthday = patch.birthday;
+    if (patch.tags !== undefined) row.tags = patch.tags;
+    if (patch.birthdayGreetedYear !== undefined) row.birthday_greeted_year = patch.birthdayGreetedYear;
     check(await this.db.from("customers").update(row).eq("id", id));
   }
 
@@ -361,11 +432,17 @@ export class SupabaseRepository implements Repository {
     const row = check(await this.db.from("staff").select().eq("id", id).maybeSingle());
     return row ? toStaff(row) : null;
   }
-  async createStaff(input: Omit<Staff, "id" | "createdAt">) {
+  async createStaff(input: NewStaff) {
     const row = check(
       await this.db
         .from("staff")
-        .insert({ name: input.name, back_rates: input.backRates, active: input.active })
+        .insert({
+          name: input.name,
+          back_rates: input.backRates,
+          active: input.active,
+          password_hash: input.passwordHash ?? null,
+          pending: input.pending ?? false,
+        })
         .select()
         .single(),
     );
@@ -376,6 +453,8 @@ export class SupabaseRepository implements Repository {
     if (patch.name !== undefined) row.name = patch.name;
     if (patch.backRates !== undefined) row.back_rates = patch.backRates;
     if (patch.active !== undefined) row.active = patch.active;
+    if (patch.passwordHash !== undefined) row.password_hash = patch.passwordHash;
+    if (patch.pending !== undefined) row.pending = patch.pending;
     return toStaff(check(await this.db.from("staff").update(row).eq("id", id).select().single()));
   }
 
@@ -488,6 +567,93 @@ export class SupabaseRepository implements Repository {
 
   async purgePersonalData(cutoff: Date): Promise<PurgeResult> {
     return check(await this.db.rpc("purge_personal_data", { cutoff: cutoff.toISOString() })) as PurgeResult;
+  }
+
+  async listMenu() {
+    const rows = check(await this.db.from("menu_items").select().order("sort_order").order("created_at"));
+    return (rows as any[]).map(toMenuItem);
+  }
+  async createMenuItem(input: Omit<MenuItem, "id" | "createdAt">) {
+    const row = check(
+      await this.db
+        .from("menu_items")
+        .insert({ name: input.name, category: input.category, price: input.price, available: input.available, sort_order: input.sortOrder })
+        .select()
+        .single(),
+    );
+    return toMenuItem(row);
+  }
+  async updateMenuItem(id: string, patch: Partial<Omit<MenuItem, "id" | "createdAt">>) {
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.category !== undefined) row.category = patch.category;
+    if (patch.price !== undefined) row.price = patch.price;
+    if (patch.available !== undefined) row.available = patch.available;
+    if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+    return toMenuItem(check(await this.db.from("menu_items").update(row).eq("id", id).select().single()));
+  }
+  async deleteMenuItem(id: string) {
+    check(await this.db.from("menu_items").delete().eq("id", id));
+  }
+
+  async listOrderTables() {
+    const rows = check(await this.db.from("order_tables").select().order("created_at"));
+    return (rows as any[]).map(toOrderTable);
+  }
+  async getOrderTableByToken(token: string) {
+    const row = check(await this.db.from("order_tables").select().eq("token", token).maybeSingle());
+    return row ? toOrderTable(row) : null;
+  }
+  async createOrderTable(input: Omit<OrderTable, "id" | "createdAt">) {
+    const row = check(
+      await this.db.from("order_tables").insert({ name: input.name, token: input.token, active: input.active }).select().single(),
+    );
+    return toOrderTable(row);
+  }
+  async updateOrderTable(id: string, patch: Partial<Omit<OrderTable, "id" | "createdAt">>) {
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.token !== undefined) row.token = patch.token;
+    if (patch.active !== undefined) row.active = patch.active;
+    return toOrderTable(check(await this.db.from("order_tables").update(row).eq("id", id).select().single()));
+  }
+
+  async createOrder(input: { tableId: string; tableName: string; lines: Order["lines"]; total: number; note: string | null }) {
+    const row = check(
+      await this.db
+        .from("orders")
+        .insert({ table_id: input.tableId, table_name: input.tableName, lines: input.lines, total: input.total, note: input.note })
+        .select()
+        .single(),
+    );
+    return toOrder(row);
+  }
+  async getOrder(id: string) {
+    const row = check(await this.db.from("orders").select().eq("id", id).maybeSingle());
+    return row ? toOrder(row) : null;
+  }
+  async listOrders(query: OrderQuery) {
+    let q = this.db.from("orders").select().order("created_at", { ascending: false }).limit(query.limit ?? 500);
+    if (query.since) q = q.gte("created_at", query.since.toISOString());
+    if (query.tableId) q = q.eq("table_id", query.tableId);
+    if (query.status) q = q.eq("status", query.status);
+    return (check(await q) as any[]).map(toOrder);
+  }
+  async updateOrder(id: string, patch: Partial<Pick<Order, "status" | "saleId">>) {
+    const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (patch.status !== undefined) row.status = patch.status;
+    if (patch.saleId !== undefined) row.sale_id = patch.saleId;
+    return toOrder(check(await this.db.from("orders").update(row).eq("id", id).select().single()));
+  }
+
+  async savePromoImage(key: string, data: Uint8Array, contentType: string) {
+    const { error } = await this.db.storage.from(BUCKET).upload(`promo/${key}`, data, { contentType, upsert: true });
+    if (error) throw new Error(`Supabase storage: ${error.message}`);
+  }
+  async getPromoImage(key: string) {
+    const { data, error } = await this.db.storage.from(BUCKET).download(`promo/${key}`);
+    if (error || !data) return null;
+    return { data: new Uint8Array(await data.arrayBuffer()), contentType: data.type || "image/jpeg" };
   }
 
   async addAudit(entry: Omit<AuditLog, "id" | "createdAt">) {

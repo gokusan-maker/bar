@@ -111,7 +111,9 @@ export async function saveSettingsAction(formData: FormData) {
   const backTarget = str(formData, "backTarget");
   const rate = Number(str(formData, "serviceChargeRate"));
 
+  // この画面にない項目（注文・集客・招待リンクなど）はそのまま残す
   const settings: ShopSettings = {
+    ...current,
     shopName: str(formData, "shopName") || current.shopName,
     shopType: str(formData, "shopType") || current.shopType,
     seatAreas,
@@ -185,13 +187,6 @@ export async function manualReplyAction(formData: FormData) {
     }
   }
   back(`/admin/customers/${customerId}`);
-}
-
-export async function saveCustomerNoteAction(formData: FormData) {
-  await requireAdmin();
-  const customerId = str(formData, "customerId");
-  await repository().updateCustomer(customerId, { note: str(formData, "note") || null });
-  back(`/admin/customers/${customerId}`, { saved: "1" });
 }
 
 export async function simulatorSendAction(formData: FormData) {

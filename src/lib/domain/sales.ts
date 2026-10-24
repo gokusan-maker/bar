@@ -17,20 +17,16 @@ export const saleTotal = (s: Pick<Sale, "drinkAmount" | "chargeAmount" | "servic
   s.drinkAmount + s.chargeAmount + s.serviceAmount;
 
 export interface BackBreakdown {
-  drink: number;
-  charge: number;
-  service: number;
+  /** 売上全体 × バック率（円未満切り捨て） */
+  byRate: number;
   perVisit: number;
   total: number;
 }
 
-/** 1会計分のバック。項目ごとに円未満を切り捨てる */
+/** 1会計分のバック。サービス料も含めた売上全体にバック率をかける */
 export function backForSale(sale: Sale, rates: BackRates): BackBreakdown {
-  const drink = Math.floor((sale.drinkAmount * rates.drink) / 100);
-  const charge = Math.floor((sale.chargeAmount * rates.charge) / 100);
-  const service = Math.floor((sale.serviceAmount * rates.service) / 100);
-  const perVisit = rates.perVisit;
-  return { drink, charge, service, perVisit, total: drink + charge + service + perVisit };
+  const byRate = Math.floor((saleTotal(sale) * rates.rate) / 100);
+  return { byRate, perVisit: rates.perVisit, total: byRate + rates.perVisit };
 }
 
 export function isBackTarget(sale: Sale, settings: Pick<ShopSettings, "backTarget">): boolean {
@@ -94,7 +90,7 @@ export function monthlyReport(
   const rows = new Map<string, StaffBackRow>(
     staffList.map((staff) => [
       staff.id,
-      { staff, sales: emptyTotals(), back: { drink: 0, charge: 0, service: 0, perVisit: 0, total: 0 } },
+      { staff, sales: emptyTotals(), back: { byRate: 0, perVisit: 0, total: 0 } },
     ]),
   );
 
@@ -106,9 +102,7 @@ export function monthlyReport(
     if (!row || !isBackTarget(s, settings)) continue;
     addSale(row.sales, s);
     const b = backForSale(s, row.staff.backRates);
-    row.back.drink += b.drink;
-    row.back.charge += b.charge;
-    row.back.service += b.service;
+    row.back.byRate += b.byRate;
     row.back.perVisit += b.perVisit;
     row.back.total += b.total;
   }
@@ -155,14 +149,14 @@ export const toCsv = (header: string[], rows: (string | number | null)[][]) =>
 /** 給与計算用のCSV（Excelで開けるようBOM付き） */
 export function reportCsv(report: MonthlyReport): string {
   const header = [
-    "スタッフ", "組数", "人数", "ドリンク売上", "料金売上", "サービス料売上", "対象売上合計",
-    "ドリンクバック", "料金バック", "サービス料バック", "固定バック", "バック合計",
+    "スタッフ", "バック率(%)", "組数", "人数", "ドリンク売上", "料金売上", "サービス料売上", "対象売上合計",
+    "率によるバック", "固定バック", "バック合計",
   ];
   return toCsv(
     header,
     report.staff.map((r) => [
-      r.staff.name, r.sales.count, r.sales.guests, r.sales.drink, r.sales.charge, r.sales.service, r.sales.total,
-      r.back.drink, r.back.charge, r.back.service, r.back.perVisit, r.back.total,
+      r.staff.name, r.staff.backRates.rate, r.sales.count, r.sales.guests, r.sales.drink, r.sales.charge, r.sales.service,
+      r.sales.total, r.back.byRate, r.back.perVisit, r.back.total,
     ]),
   );
 }
