@@ -31,6 +31,8 @@ SNS（LINE・Instagram）のメッセージで届いた予約を自動で読み�
 | 今夜のまとめ | 予約一覧の先頭に、今夜の組数・人数・承認待ちと、時間ごとの席の埋まり具合を表示 |
 | スマホ用の下部タブ | 予約・売上・お客様・メッセージ・設定をアプリのように切り替え |
 | 店のカスタマイズ | 店の種類、席の構成（カウンター・テーブル・個室など自由に追加）、チャージ額、サービス料率、バックの対象（SNS経由のみ／全売上） |
+| 紹介ページ | トップページ（`/`）でアプリの機能を紹介し、「お店を登録する」へ案内。`PRICE_TEXT` で料金を表示 |
+| 月額の支払い（Stripe） | `STRIPE_SECRET_KEY`・`STRIPE_PRICE_ID`・`STRIPE_WEBHOOK_SECRET` を入れると有効。新しいお店は無料期間（`BILLING_TRIAL_DAYS`、初期値14日）のあと、オーナーが「お支払い」画面からカードで月額を申し込む。無料期間が終わる・解約・支払いの遅れ（7日の猶予のあと）で、そのお店の管理画面・予約フォーム・QR注文・自動返信を止める。店舗1と運営が免除したお店は不要。運営の画面で免除・無料期間の延長ができる |
 | お店の登録（複数店舗） | オーナーが `/signup` で店名・URL名・ログインID・パスワードを入れて登録すると、そのお店のオーナーになる。予約フォームは `/s/<URL名>/reserve`。LINE公式アカウント・Instagramはお店ごとに「設定 → SNSの接続」でつなぐ（Webhook URL はお店ごとに `/api/webhooks/line/<店舗ID>`）。`SIGNUP_CODE` を決めると、登録コードを知っている人だけが登録できる |
 | オーナーとスタッフのログイン | ログイン画面は別々（オーナー `/owner/login`、スタッフ `/login`）。どちらも **LINEでログイン** でも **ログインIDとパスワード** でも入れる（オーナーのIDは設定画面で変更、初期値 `admin`。パスワードは `ADMIN_PASSWORD`）。オーナーは料金・メニュー・バック率・設定などすべてを決められる。スタッフは集客（空き状況の配信・投稿）、売上の入力（証拠写真つき）、お客様リストの登録・編集、メッセージの返信、予約の確認と来店チェック、注文の対応ができる（バックの金額・月の集計・設定・CSVは見えない） |
 | スタッフの登録 | 「スタッフ」画面の登録用リンクを送ると、スタッフが「LINEで登録」（またはログインIDとパスワード）で申請し、オーナーが承認するとログインできる。パスワードで登録したスタッフも「アカウント」からLINEを連携できる。在籍を外す・ログインを止めると、すぐにログアウトされる |
@@ -65,7 +67,7 @@ http://localhost:3000/admin/simulator を開き、「土曜の9時から2名で�
 
 ### 1. Supabase（データベース）
 1. https://supabase.com でプロジェクトを作成
-2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders → customer_profile → birthday_greeting → staff_line_login → staff_login_id → multi_shop → multi_shop_customer_key）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
+2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders → customer_profile → birthday_greeting → staff_line_login → staff_login_id → multi_shop → multi_shop_customer_key → billing）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
 3. Project Settings → Data API → **Exposed schemas に `bar` を追加**して保存（しないとアプリから表が見えません）
 4. Project Settings → API の URL と `service_role` キーを `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` に設定
 5. `TOKEN_ENCRYPTION_KEY` に長いランダム文字列を設定（例: `openssl rand -base64 32`）

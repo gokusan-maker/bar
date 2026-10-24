@@ -21,6 +21,8 @@ export async function signupShop(
   repoFor: (shopId: string) => Repository,
   input: SignupInput,
   reservedLoginIds: string[] = [],
+  /** 無料期間の終わり（支払いを使わないときは null） */
+  trialEndsAt: string | null = null,
 ): Promise<SignupResult> {
   const shopName = input.shopName.trim().slice(0, 40);
   const ownerName = input.ownerName.trim().slice(0, 30);
@@ -36,7 +38,7 @@ export async function signupShop(
   const pwProblem = passwordProblem(input.password);
   if (pwProblem) return { ok: false, error: pwProblem };
 
-  const shop = await dir.createShop({ name: shopName, slug });
+  const shop = await dir.createShop({ name: shopName, slug, trialEndsAt });
   const repo = repoFor(shop.id);
   await repo.saveSettings({ ...DEFAULT_SETTINGS, shopName });
   const owner = await repo.createStaff({

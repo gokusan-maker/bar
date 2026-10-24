@@ -1,13 +1,13 @@
 import "server-only";
 import { after, NextResponse } from "next/server";
-import { directory, instagramClient, lineClient, reservationService, shopSecrets } from "./container";
+import { instagramClient, lineClient, reservationService, shopAccessFor, shopSecrets } from "./container";
 import { parseInstagramEvents, verifyMetaSignature } from "./integrations/instagram";
 import { parseLineEvents, verifyLineSignature } from "./integrations/line";
 import { withShop } from "./shop-context";
 
-/** 店舗があり、利用中か */
+/** 店舗があり、利用中（支払い済み・無料期間中）か */
 async function activeShop(shopId: string) {
-  return !!(await directory().getShop(shopId))?.active;
+  return (await shopAccessFor(shopId)) !== "locked";
 }
 
 /** LINE公式アカウントからのWebhook（店舗ごとのURL） */

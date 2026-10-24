@@ -5,6 +5,8 @@ import { GoogleCalendarSync, type GoogleOAuthConfig } from "./integrations/googl
 import { InstagramClient } from "./integrations/instagram";
 import { LineClient } from "./integrations/line";
 import type { LineLoginConfig } from "./integrations/line-login";
+import type { StripeConfig } from "./integrations/stripe";
+import { shopAccess, type Access } from "./domain/billing";
 import { noopCalendar, type CalendarSync, type Messenger, type Notifier } from "./ports";
 import { canMessage, DEFAULT_SHOP_ID, type ShopSecrets } from "./domain/types";
 import { MemoryDirectory, SupabaseDirectory, type ShopDirectory } from "./directory";
@@ -89,6 +91,27 @@ export function repository(): Repository {
       };
     },
   });
+}
+
+/** 月額の支払い（Stripe）。3つの値がそろったときだけ使う */
+export function stripeConfig(): StripeConfig | null {
+  const secretKey = env("STRIPE_SECRET_KEY");
+  const priceId = env("STRIPE_PRICE_ID");
+  const webhookSecret = env("STRIPE_WEBHOOK_SECRET");
+  return secretKey && priceId && webhookSecret ? { secretKey, priceId, webhookSecret } : null;
+}
+
+/** 無料期間の日数（初期値14日） */
+export function trialDays(): number {
+  const days = Number(env("BILLING_TRIAL_DAYS") ?? 14);
+  return Number.isFinite(days) && days >= 0 ? days : 14;
+}
+
+/** お店を使えるか（支払いの状態）。お店が止められている・見つからなければ locked */
+export async function shopAccessFor(shopId: string, now = new Date()): Promise<Access> {
+  const shop = await directory().getShop(shopId);
+  if (!shop?.active) return "locked";
+  return shopAccess(shop.billing, now, !!stripeConfig());
 }
 
 /** 今の店舗の公開URL（予約フォームなど）の土台。例: https://…/s/shop1 */

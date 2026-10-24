@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { directory, repository, reservationService } from "@/lib/container";
+import { directory, repository, reservationService, shopAccessFor } from "@/lib/container";
 import { withShop } from "@/lib/shop-context";
 import { addDays, formatJa, toJst, weekdayJa, weekdayOf } from "@/lib/domain/time";
 import { DateTimePartyFields, type DateOption } from "./fields";
@@ -23,7 +23,7 @@ async function submit(formData: FormData) {
   "use server";
   const slug = String(formData.get("shop") ?? "");
   const shop = await directory().getShopBySlug(slug);
-  if (!shop?.active) notFound();
+  if (!shop || (await shopAccessFor(shop.id)) === "locked") notFound();
   return withShop(shop.id, () => submitForShop(formData, `/s/${shop.slug}/reserve`));
 }
 
@@ -95,7 +95,7 @@ export default async function ReservePage({
   searchParams: Promise<{ s?: string; at?: string; n?: string; error?: string; from?: string }>;
 }) {
   const shop = await directory().getShopBySlug((await routeParams).slug);
-  if (!shop?.active) notFound();
+  if (!shop || (await shopAccessFor(shop.id)) === "locked") notFound();
   const params = await searchParams;
   return withShop(shop.id, () => renderReserve(shop.slug, params));
 }

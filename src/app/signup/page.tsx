@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { reservedLoginIds, startMemberSession } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
-import { directory, shopRepository } from "@/lib/container";
+import { directory, shopRepository, stripeConfig, trialDays } from "@/lib/container";
 import { DEFAULT_SHOP_ID } from "@/lib/domain/types";
 import { clientIp, isLockedOut, recordFailure } from "@/lib/login-guard";
 import { withShop } from "@/lib/shop-context";
@@ -41,6 +41,7 @@ async function signupAction(formData: FormData) {
     shopRepository,
     { ...keep, password: String(formData.get("password") ?? "") },
     await reservedLoginIds(),
+    stripeConfig() ? new Date(Date.now() + trialDays() * 86400_000).toISOString() : null,
   );
   if (!result.ok) back(result.error);
   else {

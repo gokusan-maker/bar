@@ -244,6 +244,8 @@ export interface BackRates {
 /** これまでのデータ（1店舗だけだったころ）を入れた店舗 */
 export const DEFAULT_SHOP_ID = "00000000-0000-4000-8000-000000000001";
 
+export type BillingStatus = "trialing" | "active" | "past_due" | "canceled";
+
 export interface Shop {
   id: string;
   name: string;
@@ -251,6 +253,20 @@ export interface Shop {
   slug: string;
   active: boolean;
   createdAt: string;
+  billing: ShopBilling;
+}
+
+/** 月額の支払い（Stripe）の状態 */
+export interface ShopBilling {
+  status: BillingStatus;
+  /** 無料期間の終わり（ISO）。null は期限なし */
+  trialEndsAt: string | null;
+  /** 支払いが不要なお店（店舗1・運営が決めたお店） */
+  exempt: boolean;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  /** 支払い済みの期間の終わり（ISO） */
+  currentPeriodEnd: string | null;
 }
 
 /** 店舗ごとのSNS接続の秘密情報（暗号化して保存） */

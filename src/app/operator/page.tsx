@@ -29,6 +29,25 @@ async function toggleShopAction(formData: FormData) {
   redirect("/operator");
 }
 
+/** 支払いの免除・無料期間の延長（運営の判断で） */
+async function billingAction(formData: FormData) {
+  "use server";
+  if (!(await isOperator())) redirect("/operator");
+  const id = String(formData.get("id"));
+  const dir = directory();
+  const shop = await dir.getShop(id);
+  if (!shop) redirect("/operator");
+  if (formData.get("op") === "exempt") await dir.updateBilling(id, { exempt: !shop.billing.exempt });
+  if (formData.get("op") === "extend") {
+    const from = Math.max(Date.now(), shop.billing.trialEndsAt ? new Date(shop.billing.trialEndsAt).getTime() : 0);
+    await dir.updateBilling(id, { status: shop.billing.status === "canceled" ? "trialing" : shop.billing.status, trialEndsAt: new Date(from + 14 * 86400_000).toISOString() });
+  }
+  revalidatePath("/operator");
+  redirect("/operator");
+}
+
+const BILLING_LABEL = { trialing: "無料期間", active: "契約中", past_due: "支払い待ち", canceled: "解約" };
+
 /** 運営の画面：登録されたお店の一覧 */
 export default async function OperatorPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (!operatorEnabled()) notFound();
@@ -73,6 +92,7 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
               <th>スタッフ</th>
               <th>お客様</th>
               <th>登録日</th>
+              <th>お支払い</th>
               <th>状態</th>
             </tr>
           </thead>
@@ -85,6 +105,21 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
                 <td>{staff}人</td>
                 <td>{customers}人</td>
                 <td>{shop.createdAt.slice(0, 10)}</td>
+                <td>
+                  {shop.billing.exempt ? "不要" : BILLING_LABEL[shop.billing.status]}
+                  {!shop.billing.exempt && shop.billing.status === "trialing" && shop.billing.trialEndsAt && `（〜${shop.billing.trialEndsAt.slice(5, 10).replace("-", "/")}）`}
+                  <form action={billingAction} className="row" style={{ gap: 4, marginTop: 4 }}>
+                    <input type="hidden" name="id" value={shop.id} />
+                    <button type="submit" name="op" value="exempt">
+                      {shop.billing.exempt ? "支払いを必要に" : "支払いを免除"}
+                    </button>
+                    {!shop.billing.exempt && shop.billing.status !== "active" && (
+                      <button type="submit" name="op" value="extend">
+                        無料を14日延長
+                      </button>
+                    )}
+                  </form>
+                </td>
                 <td>
                   <form action={toggleShopAction}>
                     <input type="hidden" name="id" value={shop.id} />

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { authMode, currentSession, requireStaff } from "@/lib/auth";
-import { googleOAuthConfig, isMemoryMode, repository } from "@/lib/container";
+import { directory, googleOAuthConfig, isMemoryMode, repository, shopAccessFor } from "@/lib/container";
+import { trialDaysLeft } from "@/lib/domain/billing";
 import { logoutAction } from "./actions";
 import { TabBar } from "./tabbar";
 
@@ -12,6 +13,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await currentSession();
   const staffName = owner ? null : session?.staffName;
   const shopName = (await repository().getSettings()).shopName;
+  // 無料期間の残り・支払いの遅れをオーナーに知らせる
+  const shop = owner && session ? await directory().getShop(session.shopId) : null;
+  const access = shop ? await shopAccessFor(shop.id) : "ok";
+  const daysLeft = shop ? trialDaysLeft(shop.billing, new Date()) : null;
   const warnings = !owner ? [] : [
     isMemoryMode() && "データベース未接続のため、データはメモリに保存されています（再起動で消えます）。",
     authMode() === "open-dev" && "ADMIN_PASSWORD 未設定のため、ログインなしで表示しています（開発モード）。",
@@ -62,6 +67,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </nav>
       <main className="container with-tabbar">
+        {access === "trial" && daysLeft !== null && daysLeft <= 7 && (
+          <p className="notice">
+            無料期間はあと{daysLeft}日です。<Link href="/billing">お支払いの登録</Link>をお願いします。
+          </p>
+        )}
+        {access === "grace" && (
+          <p className="notice error">
+            お支払いが確認できていません。<Link href="/billing">カード情報をご確認ください</Link>。
+          </p>
+        )}
         {warnings.length > 0 && (
           <details className="notice">
             <summary>セットアップが未完了の項目があります（{warnings.length}件）</summary>

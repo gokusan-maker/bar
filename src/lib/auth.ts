@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { directory, shopRepository } from "./container";
+import { directory, shopAccessFor, shopRepository } from "./container";
 import { sign, verifySigned } from "./crypto";
 import { DEFAULT_SHOP_ID, type Staff } from "./domain/types";
 import { verifyPassword } from "./password";
@@ -114,18 +114,24 @@ export async function isAdmin(): Promise<boolean> {
   return (await currentRole()) === "owner";
 }
 
+/** 支払いが済んでいない（無料期間が終わった・解約した）お店は、お支払いの画面へ */
+async function requireUsableShop(session: Session): Promise<void> {
+  if ((await shopAccessFor(session.shopId)) === "locked") redirect("/billing");
+}
+
 /** 店主専用の画面・サーバーアクションの先頭で呼ぶ */
 export async function requireAdmin(): Promise<void> {
-  const role = await currentRole();
-  if (role === "owner") return;
-  redirect(role === "staff" ? "/admin?forbidden=1" : "/owner/login");
+  const session = await currentSession();
+  if (session?.role === "owner") return requireUsableShop(session);
+  redirect(session?.role === "staff" ? "/admin?forbidden=1" : "/owner/login");
 }
 
 /** スタッフも使える画面・操作の先頭で呼ぶ */
 export async function requireStaff(): Promise<Role> {
-  const role = await currentRole();
-  if (!role) redirect("/login");
-  return role;
+  const session = await currentSession();
+  if (!session) redirect("/login");
+  await requireUsableShop(session);
+  return session.role;
 }
 
 const matches = (input: string, expected: string | undefined) => {

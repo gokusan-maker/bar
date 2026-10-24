@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { directory, repository } from "@/lib/container";
+import { directory, repository, shopAccessFor } from "@/lib/container";
 import { withShop } from "@/lib/shop-context";
 import { ORDER_STATUS_LABEL } from "@/lib/domain/types";
 import { businessDayStart, placeOrder } from "@/lib/order-service";
@@ -22,8 +22,7 @@ export default async function OrderPage({
   const { done, error } = await searchParams;
   // QRコードの文字列から店舗を決める
   const shopId = await directory().findShopIdByTableToken(token);
-  const shop = shopId ? await directory().getShop(shopId) : null;
-  if (!shopId || !shop?.active) {
+  if (!shopId || (await shopAccessFor(shopId)) === "locked") {
     return (
       <main className="container" style={{ maxWidth: 520, paddingTop: 32 }}>
         <p className="notice error">このQRコードは使えません。お手数ですがスタッフにお声がけください。</p>
