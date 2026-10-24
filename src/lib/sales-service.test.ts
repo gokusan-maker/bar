@@ -34,7 +34,7 @@ describe("SalesService", () => {
 
   it("prefills from a reservation, including after-midnight business dates", async () => {
     const customer = await repo.findOrCreateCustomer("line", "U1", "やまだ");
-    const staff = await repo.createStaff({ name: "あや", active: true, backRates: { drink: 10, charge: 0, service: 0, perVisit: 0 } });
+    const staff = await repo.createStaff({ name: "あや", active: true, backRates: { rate: 10, perVisit: 0 } });
     await repo.updateCustomer(customer.id, { staffId: staff.id });
     const r = await repo.createReservation({
       customerId: customer.id,
@@ -73,7 +73,7 @@ describe("SalesService", () => {
 
   it("marks the reservation visited, prevents double entry and remembers the staff", async () => {
     const customer = await repo.findOrCreateCustomer("instagram", "IG1", "ig");
-    const staff = await repo.createStaff({ name: "りな", active: true, backRates: { drink: 10, charge: 0, service: 0, perVisit: 0 } });
+    const staff = await repo.createStaff({ name: "りな", active: true, backRates: { rate: 10, perVisit: 0 } });
     const r = await repo.createReservation({
       customerId: customer.id,
       channel: "instagram",
@@ -122,16 +122,17 @@ describe("SalesService", () => {
   });
 
   it("builds the monthly report from stored sales", async () => {
-    const staff = await repo.createStaff({ name: "あや", active: true, backRates: { drink: 10, charge: 5, service: 0, perVisit: 300 } });
+    const staff = await repo.createStaff({ name: "あや", active: true, backRates: { rate: 10, perVisit: 300 } });
     await service.createSale(input({ staffId: staff.id, channel: "line" }));
     await service.createSale(input({ staffId: staff.id, channel: "line", businessDate: "2026-11-01" }));
     const report = await service.report("2026-10");
     expect(report.all.total).toBe(9200);
-    expect(report.staff[0].back.total).toBe(600 + 100 + 300);
+    // サービス料も含めた売上全体 9200 × 10% ＋ 固定 300
+    expect(report.staff[0].back.total).toBe(920 + 300);
   });
 
   it("links a walk-in sale to an existing customer and inherits name and staff", async () => {
-    const staff = await repo.createStaff({ name: "あや", active: true, backRates: { drink: 10, charge: 0, service: 0, perVisit: 0 } });
+    const staff = await repo.createStaff({ name: "あや", active: true, backRates: { rate: 10, perVisit: 0 } });
     const customer = await repo.findOrCreateCustomer("line", "U9", "やまだ");
     await repo.updateCustomer(customer.id, { name: "山田", staffId: staff.id });
     const r = await service.createSale(input({ customerId: customer.id, customerName: null, channel: "line" }));

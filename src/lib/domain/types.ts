@@ -44,6 +44,14 @@ export interface Customer {
   note: string | null;
   /** 担当スタッフ（バックの計算先） */
   staffId: string | null;
+  /** 電話番号（数字のみ） */
+  phone: string | null;
+  /** 誕生日 "MM-DD"（年は持たない） */
+  birthday: string | null;
+  /** 自由なタグ（常連、VIP、ワイン好き など） */
+  tags: string[];
+  /** 誕生日のメッセージを最後に送った年（同じ年に二重に送らないため） */
+  birthdayGreetedYear: number | null;
   createdAt: string;
 }
 
@@ -150,6 +158,34 @@ export interface ShopSettings {
   shopMessage: string;
   /** LINE公式アカウントの友だち追加URL（https://lin.ee/...）。フォームや投稿でLINEへ案内する */
   lineFriendUrl: string;
+  /** スタッフ招待リンクの合言葉。空なら招待リンクからの登録を受け付けない */
+  staffInviteCode: string;
+  /** QRコード・URLからのお酒の注文を受け付ける */
+  orderingEnabled: boolean;
+  /** 空き状況をLINEの友だち全員に自動で配信する（集客） */
+  promoEnabled: boolean;
+  /** 配信する時刻（noon=12時、evening=17時） */
+  promoTime: "noon" | "evening";
+  /** 配信する曜日（0=日〜6=土） */
+  promoWeekdays: number[];
+  /** 配信の最初に入れるひとこと（おすすめ・イベントなど） */
+  promoMessage: string;
+  /** Instagramにも投稿する（画像が必要） */
+  promoInstagram: boolean;
+  /** Instagram投稿に使う画像（公開URL /promo-image/<key>）。空なら未設定 */
+  promoImageKey: string;
+  /** 最後に配信した営業日（同じ日に二重に送らないため） */
+  promoLastSentDate: string;
+  /** LINEでログインできる店主のLINEユーザーID（設定画面で連携。店舗1の旧オーナー用） */
+  ownerLineUserIds: string[];
+  /** 店主への通知を送るLINEユーザーID（この店のLINE公式アカウントを友だち追加した店主） */
+  ownerNotifyLineUserId: string;
+  /** オーナーのログインID（パスワードは ADMIN_PASSWORD） */
+  ownerLoginId: string;
+  /** 誕生日の当日にLINEでお祝いを送る */
+  birthdayGreetingEnabled: boolean;
+  /** お祝いの文。{name} がお名前に置き換わる */
+  birthdayMessage: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -183,21 +219,82 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   shopPhone: "",
   shopMessage: "",
   lineFriendUrl: "",
+  staffInviteCode: "",
+  orderingEnabled: true,
+  promoEnabled: false,
+  promoTime: "evening",
+  promoWeekdays: [0, 1, 2, 3, 4, 5, 6],
+  promoMessage: "",
+  promoInstagram: false,
+  promoImageKey: "",
+  promoLastSentDate: "",
+  ownerLineUserIds: [],
+  ownerNotifyLineUserId: "",
+  ownerLoginId: "admin",
+  birthdayGreetingEnabled: false,
+  birthdayMessage: "{name}様、お誕生日おめでとうございます🎂\n素敵な1年になりますように。今月ご来店の際は、お祝いに1杯サービスいたします🥂",
 };
 
-/** バック率（%）と1組あたりの固定バック（円） */
+/** 売上全体（お酒＋料金＋サービス料）に対するバック率（%）と、1組あたりの固定バック（円） */
 export interface BackRates {
-  drink: number;
-  charge: number;
-  service: number;
+  rate: number;
   perVisit: number;
 }
 
+/** これまでのデータ（1店舗だけだったころ）を入れた店舗 */
+export const DEFAULT_SHOP_ID = "00000000-0000-4000-8000-000000000001";
+
+export type BillingStatus = "trialing" | "active" | "past_due" | "canceled";
+
+export interface Shop {
+  id: string;
+  name: string;
+  /** 公開URL（予約フォームなど）に使う短い名前 */
+  slug: string;
+  active: boolean;
+  createdAt: string;
+  billing: ShopBilling;
+}
+
+/** 月額の支払い（Stripe）の状態 */
+export interface ShopBilling {
+  status: BillingStatus;
+  /** 無料期間の終わり（ISO）。null は期限なし */
+  trialEndsAt: string | null;
+  /** 支払いが不要なお店（店舗1・運営が決めたお店） */
+  exempt: boolean;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  /** 支払い済みの期間の終わり（ISO） */
+  currentPeriodEnd: string | null;
+}
+
+/** 店舗ごとのSNS接続の秘密情報（暗号化して保存） */
+export interface ShopSecrets {
+  lineChannelSecret?: string;
+  lineChannelAccessToken?: string;
+  instagramAccessToken?: string;
+  instagramAppSecret?: string;
+  instagramVerifyToken?: string;
+}
+
+export type MemberRole = "owner" | "staff";
+
 export interface Staff {
   id: string;
+  /** owner=オーナー（店のすべてを決める）、staff=スタッフ */
+  role: MemberRole;
   name: string;
   backRates: BackRates;
   active: boolean;
+  /** スタッフ自身のログイン用パスワードのハッシュ。null ならログインできない */
+  passwordHash: string | null;
+  /** 招待リンクから登録し、店主の承認を待っている */
+  pending: boolean;
+  /** LINEでログインするためのLINEユーザーID（LINEログインで確認したもの） */
+  lineUserId: string | null;
+  /** IDとパスワードでログインするときのID（小文字の英数字。重複なし） */
+  loginId: string | null;
   createdAt: string;
 }
 
@@ -238,7 +335,7 @@ export interface AuditLog {
   id: string;
   actor: "owner" | "staff" | "guest" | "system";
   action: string;
-  targetType: "reservation" | "sale" | "attachment" | "staff" | "settings" | "customer" | "integration";
+  targetType: "reservation" | "sale" | "attachment" | "staff" | "settings" | "customer" | "integration" | "order";
   targetId: string | null;
   detail: string | null;
   createdAt: string;
@@ -248,4 +345,57 @@ export interface GoogleIntegration {
   refreshToken: string;
   calendarId: string;
   accountEmail: string | null;
+}
+
+/** QRコード注文のメニュー */
+export interface MenuItem {
+  id: string;
+  name: string;
+  /** 見出し（例: ビール、カクテル、ソフトドリンク） */
+  category: string;
+  /** 円（入力どおり。税の計算はしない） */
+  price: number;
+  /** 品切れ・提供休止なら false（お客様の画面に出さない） */
+  available: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+/** 注文用QRコードを置く席。token がQRコードのURLに入る */
+export interface OrderTable {
+  id: string;
+  name: string;
+  token: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface OrderLine {
+  menuItemId: string;
+  name: string;
+  price: number;
+  qty: number;
+}
+
+export type OrderStatus = "new" | "served" | "cancelled";
+
+export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  new: "未提供",
+  served: "提供済み",
+  cancelled: "取消",
+};
+
+export interface Order {
+  id: string;
+  tableId: string;
+  /** 注文時点の席名（あとで席名を変えても残る） */
+  tableName: string;
+  lines: OrderLine[];
+  total: number;
+  note: string | null;
+  status: OrderStatus;
+  /** 売上に取り込んだら、その売上 */
+  saleId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -15,7 +15,11 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const { themeColor } = await repository().getSettings();
+  // ログイン前や公開ページでは店舗が決まらないことがあるので、そのときは標準の色
+  const themeColor = await repository()
+    .getSettings()
+    .then((s) => s.themeColor)
+    .catch(() => "amber");
   const theme = THEMES[isThemeKey(themeColor) ? themeColor : "amber"];
   return (
     <html
