@@ -29,7 +29,8 @@ SNS（LINE・Instagram）のメッセージで届いた予約を自動で読み�
 | 今夜のまとめ | 予約一覧の先頭に、今夜の組数・人数・承認待ちと、時間ごとの席の埋まり具合を表示 |
 | スマホ用の下部タブ | 予約・売上・お客様・メッセージ・設定をアプリのように切り替え |
 | 店のカスタマイズ | 店の種類、席の構成（カウンター・テーブル・個室など自由に追加）、チャージ額、サービス料率、バックの対象（SNS経由のみ／全売上） |
-| スタッフ用ログイン | スタッフは予約一覧の閲覧と来店チェックだけできる（売上・設定・メッセージは見えない）。「スタッフ」画面の登録用リンクを送ると、スタッフが自分の名前とパスワードを登録し、店主が承認するとログインできる。店主がパスワードを決めることも、共通の `STAFF_PASSWORD` を使うこともできる。在籍を外す・ログインを止めると、すぐにログアウトされる |
+| オーナーとスタッフのログイン | ログイン画面は別々（オーナー `/owner/login`、スタッフ `/login`）。どちらも **LINEでログイン** できる（パスワードでも可）。オーナーは料金・メニュー・バック率・設定などすべてを決められる。スタッフは集客（空き状況の配信・投稿）、売上の入力（証拠写真つき）、お客様リストの登録・編集、メッセージの返信、予約の確認と来店チェック、注文の対応ができる（バックの金額・月の集計・設定・CSVは見えない） |
+| スタッフの登録 | 「スタッフ」画面の登録用リンクを送ると、スタッフが「LINEで登録」（または名前とパスワード）で申請し、オーナーが承認するとログインできる。パスワードで登録したスタッフも「アカウント」からLINEを連携できる。在籍を外す・ログインを止めると、すぐにログアウトされる |
 | 開店前の通知 | 毎日17時に今夜の予約一覧を店主のLINEへ。Googleカレンダーに反映できなかった予約も自動で再同期 |
 | 予約の編集 | 店主が日時・人数・名前・要望を変更。カレンダーも更新し、お客様に変更を連絡（任意） |
 | 予約の集計 | 月ごとの受付数、SNS経由の割合、無断キャンセル率、キャンセル率、平均人数、曜日別の件数 |
@@ -61,7 +62,7 @@ http://localhost:3000/admin/simulator を開き、「土曜の9時から2名で�
 
 ### 1. Supabase（データベース）
 1. https://supabase.com でプロジェクトを作成
-2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders → customer_profile → birthday_greeting）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
+2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders → customer_profile → birthday_greeting → staff_line_login）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
 3. Project Settings → Data API → **Exposed schemas に `bar` を追加**して保存（しないとアプリから表が見えません）
 4. Project Settings → API の URL と `service_role` キーを `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` に設定
 5. `TOKEN_ENCRYPTION_KEY` に長いランダム文字列を設定（例: `openssl rand -base64 32`）
@@ -89,6 +90,13 @@ https://console.anthropic.com でAPIキーを発行し `ANTHROPIC_API_KEY` に�
 3. Webhook URL に `https://<ドメイン>/api/webhooks/line` を設定し「Webhookの利用」をオン
 4. LINE Official Account Manager で「応答メッセージ」をオフ（自動返信が二重にならないように）
 5. 店主への通知を受けたい場合は、店主のLINEで公式アカウントを友だち追加し、そのユーザーIDを `OWNER_LINE_USER_ID` に設定（ユーザーIDはWebhookのログか、テスト送信後のメッセージ一覧で確認できます）
+
+### 4-2. LINEでログイン（任意・おすすめ）
+1. LINE Developers の **同じプロバイダー** に「LINEログイン」チャネルを作成（Messaging API のチャネルとは別）
+2. チャネルID → `LINE_LOGIN_CHANNEL_ID`、チャネルシークレット → `LINE_LOGIN_CHANNEL_SECRET`
+3. 「LINEログイン設定」のコールバックURLに `https://<ドメイン>/api/line-login/callback` を登録し、チャネルを「公開済み」にする
+4. オーナーは `/owner/login` にパスワードでログインし、「設定」→「LINEでログインできるようにする」で自分のLINEを連携（`OWNER_LINE_USER_ID` と同じLINEなら連携しなくてもログインできます）
+5. スタッフには「スタッフ」画面の登録用リンクを送り、「LINEで登録」してもらって承認する
 
 > 自動返信は無料の「応答（reply）」で送ります。承認結果・リマインド・手動返信は「プッシュ」なので、LINEの無料メッセージ通数に含まれます。
 

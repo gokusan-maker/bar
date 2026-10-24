@@ -219,6 +219,7 @@ export class MemoryRepository implements Repository {
     const s: Staff = {
       passwordHash: null,
       pending: false,
+      lineUserId: null,
       ...input,
       backRates: { ...input.backRates },
       id: randomUUID(),

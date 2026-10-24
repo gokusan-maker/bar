@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { currentActor, requireAdmin, requireStaff } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { repository, salesService } from "@/lib/container";
 import { saleTotal } from "@/lib/domain/sales";
@@ -26,7 +26,8 @@ function go(path: string, params: Record<string, string> = {}): never {
 }
 
 async function audit(action: string, targetType: AuditLog["targetType"], targetId: string | null, detail: string | null = null) {
-  await recordAudit({ actor: "owner", action, targetType, targetId, detail });
+  const { actor, name } = await currentActor();
+  await recordAudit({ actor, action, targetType, targetId, detail: name ? `${detail ?? ""}［${name}］` : detail });
 }
 
 function filesFrom(formData: FormData): File[] {
@@ -49,7 +50,7 @@ async function saveFiles(saleId: string, files: File[]): Promise<string[]> {
 }
 
 export async function saveSaleAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const id = str(formData, "id");
   const channel = str(formData, "channel") as Channel;
   const input: SaleInput = {
@@ -102,14 +103,14 @@ export async function deleteSaleAction(formData: FormData) {
 }
 
 export async function uploadEvidenceAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const saleId = str(formData, "saleId");
   const errors = await saveFiles(saleId, filesFrom(formData));
   go(`/admin/sales/${saleId}`, errors.length ? { error: errors.join(" / ") } : { saved: "1" });
 }
 
 export async function deleteAttachmentAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const attachmentId = str(formData, "attachmentId");
   const saleId = str(formData, "saleId");
   // 履歴用のファイル名はメタ情報から取る（本体はダウンロードしない）
@@ -144,7 +145,7 @@ export async function saveStaffAction(formData: FormData) {
     if (clash) go("/admin/staff", { error: `「${name}」はほかのスタッフがログインに使っています。名前を変えてください` });
   }
   const login = disableLogin
-    ? { passwordHash: null, pending: false }
+    ? { passwordHash: null, lineUserId: null, pending: false }
     : password
       ? { passwordHash: hashPassword(password), pending: false }
       : {};
@@ -172,8 +173,8 @@ export async function reviewStaffAction(formData: FormData) {
     go("/admin/staff", { saved: "approved" });
   }
   // 却下：パスワードを消す。バック率が未設定（申請で新しく作られた）なら在籍も外して選択肢に出さない
-  const unset = Object.values(s.backRates).every((v) => v === 0);
-  await repo.updateStaff(id, { pending: false, passwordHash: null, ...(unset ? { active: false } : {}) });
+  const unset = s.backRates.rate === 0 && s.backRates.perVisit === 0;
+  await repo.updateStaff(id, { pending: false, passwordHash: null, lineUserId: null, ...(unset ? { active: false } : {}) });
   await audit("スタッフ登録を却下", "staff", id, s.name);
   go("/admin/staff", { saved: "rejected" });
 }

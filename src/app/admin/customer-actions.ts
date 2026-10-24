@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { currentActor, requireStaff } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { repository } from "@/lib/container";
 import { parseBirthday, parsePhone, parseTags } from "@/lib/domain/customers";
@@ -43,7 +43,7 @@ function readProfile(formData: FormData) {
 
 /** お店で直接お客様を登録する（電話予約・来店・紹介など） */
 export async function createCustomerAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const { error, profile } = readProfile(formData);
   const back = (e: string) => go("/admin/customers/new", { error: e });
   if (error) back(error);
@@ -61,12 +61,13 @@ export async function createCustomerAction(formData: FormData) {
     channel: CHANNELS.includes(channel) ? channel : "manual",
     staffId: str(formData, "staffId") || null,
   });
-  await recordAudit({ actor: "owner", action: "お客様を登録", targetType: "customer", targetId: customer.id, detail: customer.name });
+  const { actor, name } = await currentActor();
+  await recordAudit({ actor, action: "お客様を登録", targetType: "customer", targetId: customer.id, detail: name ? `${customer.name}［${name}］` : customer.name });
   go(`/admin/customers/${customer.id}`, { saved: "1" });
 }
 
 export async function saveCustomerProfileAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const id = str(formData, "customerId");
   const { error, profile } = readProfile(formData);
   if (error) go(`/admin/customers/${id}`, { error });

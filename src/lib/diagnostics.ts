@@ -1,7 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { authMode } from "./auth";
-import { appBaseUrl, googleOAuthConfig, instagramClient, lineClient, repository } from "./container";
+import { appBaseUrl, googleOAuthConfig, instagramClient, lineClient, lineLoginConfig, repository } from "./container";
 import { listCalendars } from "./integrations/google-calendar";
 import { DB_SCHEMA, EVIDENCE_BUCKET, supabaseClient } from "./repo/supabase";
 
@@ -22,6 +22,7 @@ const TABLES: [string, string, string?][] = [
   ["staff", "20261027000000_staff_login.sql", "password_hash"],
   ["orders", "20261028000000_orders.sql"],
   ["customers", "20261029000000_customer_profile.sql", "tags"],
+  ["staff", "20261031000000_staff_line_login.sql", "line_user_id"],
 ];
 
 /** よくある失敗を、店主にわかる言葉にする */
@@ -114,6 +115,14 @@ export async function runDiagnostics(): Promise<Check[]> {
         ? { name: "LINE公式アカウント", status: "ok", detail: `${name}・店主への通知先あり` }
         : { name: "LINE公式アカウント", status: "warn", detail: `${name}（OWNER_LINE_USER_ID 未設定のため店主に通知が届きません）` };
     }),
+  );
+
+  checks.push(
+    Promise.resolve<Check>(
+      lineLoginConfig()
+        ? { name: "LINEでログイン", status: "ok", detail: `コールバックURL: ${lineLoginConfig()!.redirectUri}` }
+        : { name: "LINEでログイン", status: "off", detail: "未設定（LINE_LOGIN_CHANNEL_ID・LINE_LOGIN_CHANNEL_SECRET）。パスワードでのログインは使えます" },
+    ),
   );
 
   checks.push(

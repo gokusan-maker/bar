@@ -25,14 +25,22 @@ const OWNER_TABS = [
   { href: "/admin/settings", label: "設定", icon: "gear", match: ["/admin/settings", "/admin/history", "/admin/diagnostics"] },
 ];
 
-/** スマホ用の下部タブ（店主のみ。スタッフは予約一覧だけなので出さない） */
-export function TabBar() {
+const STAFF_TABS = [
+  { href: "/admin", label: "予約", icon: "calendar", match: ["/admin", "/admin/reservations"] },
+  { href: "/admin/orders", label: "注文", icon: "glass", match: ["/admin/orders"] },
+  { href: "/admin/sales/new", label: "売上入力", icon: "yen", match: ["/admin/sales"] },
+  { href: "/admin/customers", label: "お客様", icon: "people", match: ["/admin/customers"] },
+  { href: "/admin/post", label: "集客", icon: "chat", match: ["/admin/post", "/admin/inbox", "/admin/account"] },
+];
+
+/** スマホ用の下部タブ（店主とスタッフで中身が違う） */
+export function TabBar({ owner }: { owner: boolean }) {
   const path = usePathname();
   const active = (match: string[]) =>
     match.some((m) => (m === "/admin" ? path === "/admin" : path === m || path.startsWith(`${m}/`)));
   return (
     <nav className="tabbar" aria-label="メインメニュー">
-      {OWNER_TABS.map((t) => (
+      {(owner ? OWNER_TABS : STAFF_TABS).map((t) => (
         <Link key={t.href} href={t.href} className={active(t.match) ? "active" : ""} aria-current={active(t.match) ? "page" : undefined}>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {ICONS[t.icon]}

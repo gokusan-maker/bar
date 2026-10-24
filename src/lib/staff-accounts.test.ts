@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword } from "./password";
 import { MemoryRepository } from "./repo/memory";
-import { authenticateStaff, MAX_PENDING, newInviteCode, registerStaff } from "./staff-accounts";
+import { authenticateStaff, canLogin, linkStaffLine, MAX_PENDING, newInviteCode, registerStaff, registerStaffWithLine } from "./staff-accounts";
 
 describe("password", () => {
   it("verifies only the original password", () => {
@@ -60,5 +60,49 @@ describe("staff self-registration", () => {
     expect(await register("みき", "short")).toMatchObject({ ok: false });
     for (let i = 1; i < MAX_PENDING; i++) expect((await register(`staff${i}`)).ok).toBe(true);
     expect(await register("もう一人")).toMatchObject({ ok: false });
+  });
+});
+
+describe("staff LINE login", () => {
+  let repo: MemoryRepository;
+  let code: string;
+
+  beforeEach(async () => {
+    repo = new MemoryRepository();
+    code = newInviteCode();
+    await repo.saveSettings({ ...(await repo.getSettings()), staffInviteCode: code });
+  });
+
+  it("registers with LINE as pending, and cannot register the same LINE twice", async () => {
+    const r = await registerStaffWithLine(repo, { code, lineUserId: "U1", name: "ゆか", ownerLineUserIds: [] });
+    expect(r).toMatchObject({ ok: true, staff: { name: "ゆか", lineUserId: "U1", pending: true } });
+    if (r.ok) expect(canLogin(r.staff)).toBe(false);
+    expect(await registerStaffWithLine(repo, { code, lineUserId: "U1", name: "ゆか", ownerLineUserIds: [] })).toMatchObject({ ok: false });
+    expect(await registerStaffWithLine(repo, { code: "bad", lineUserId: "U2", name: "x", ownerLineUserIds: [] })).toMatchObject({ ok: false });
+    expect(await registerStaffWithLine(repo, { code, lineUserId: "OWNER", name: "x", ownerLineUserIds: ["OWNER"] })).toMatchObject({ ok: false });
+  });
+
+  it("attaches LINE to a staff the owner already added, and approved LINE staff can log in", async () => {
+    const existing = await repo.createStaff({ name: "みき", active: true, backRates: { rate: 20, perVisit: 0 } });
+    const r = await registerStaffWithLine(repo, { code, lineUserId: "U3", name: "みき", ownerLineUserIds: [] });
+    expect(r.ok && r.staff.id).toBe(existing.id);
+    await repo.updateStaff(existing.id, { pending: false });
+    const s = await repo.getStaff(existing.id);
+    expect(s && canLogin(s)).toBe(true);
+    expect(s?.backRates.rate).toBe(20);
+  });
+
+  it("links LINE to a logged-in staff unless another account uses it", async () => {
+    const a = await repo.createStaff({ name: "a", active: true, backRates: { rate: 0, perVisit: 0 } });
+    const b = await repo.createStaff({ name: "b", active: true, backRates: { rate: 0, perVisit: 0 } });
+    expect(await linkStaffLine(repo, a.id, "U9", [])).toBeNull();
+    expect(await linkStaffLine(repo, b.id, "U9", [])).toContain("ほかのスタッフ");
+    expect(await linkStaffLine(repo, b.id, "OWN", ["OWN"])).toContain("店主");
+  });
+
+  it("checks passwords against the right person when a LINE-only staff has the same name", async () => {
+    await repo.createStaff({ name: "ゆか", active: true, backRates: { rate: 0, perVisit: 0 }, lineUserId: "U5" });
+    const withPassword = await repo.createStaff({ name: "ゆか", active: true, backRates: { rate: 0, perVisit: 0 }, passwordHash: hashPassword("password1") });
+    expect((await authenticateStaff(repo, "ゆか", "password1"))?.id).toBe(withPassword.id);
   });
 });

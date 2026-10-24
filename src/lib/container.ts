@@ -4,6 +4,7 @@ import { RuleBasedExtractor } from "./extraction/rule-based";
 import { GoogleCalendarSync, type GoogleOAuthConfig } from "./integrations/google-calendar";
 import { InstagramClient } from "./integrations/instagram";
 import { LineClient } from "./integrations/line";
+import type { LineLoginConfig } from "./integrations/line-login";
 import { noopCalendar, type CalendarSync, type Messenger, type Notifier } from "./ports";
 import { canMessage } from "./domain/types";
 import { MemoryRepository } from "./repo/memory";
@@ -30,6 +31,15 @@ export function googleOAuthConfig(): GoogleOAuthConfig | null {
 export function lineClient(): LineClient | null {
   const token = env("LINE_CHANNEL_ACCESS_TOKEN");
   return token ? new LineClient(token) : null;
+}
+
+/** LINEログイン（LINE_LOGIN_CHANNEL_ID・LINE_LOGIN_CHANNEL_SECRET・APP_BASE_URL がそろったとき） */
+export function lineLoginConfig(): LineLoginConfig | null {
+  const channelId = env("LINE_LOGIN_CHANNEL_ID");
+  const channelSecret = env("LINE_LOGIN_CHANNEL_SECRET");
+  const base = appBaseUrl();
+  if (!channelId || !channelSecret || !base) return null;
+  return { channelId, channelSecret, redirectUri: `${base}/api/line-login/callback` };
 }
 
 export function instagramClient(): InstagramClient | null {

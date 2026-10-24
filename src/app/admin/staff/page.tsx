@@ -17,16 +17,18 @@ function LoginFields({ s }: { s?: Staff }) {
   return (
     <details>
       <summary>
-        {!s ? "ログイン用パスワード（任意）" : `ログイン：${s.passwordHash ? "あり（自分の名前とパスワードでログイン）" : "なし"}`}
+        {!s
+          ? "ログイン用パスワード（任意）"
+          : `ログイン：${[s.lineUserId && "LINE", s.passwordHash && "パスワード"].filter(Boolean).join("・") || "なし"}`}
       </summary>
       <label>
         ログイン用パスワードを{s?.passwordHash ? "変更" : "設定"}（{MIN_PASSWORD_LENGTH}文字以上。空欄なら変えません）
         <input type="password" name="password" minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
       </label>
-      {s?.passwordHash && (
+      {(s?.passwordHash || s?.lineUserId) && (
         <label>
           <input type="checkbox" name="disableLogin" />
-          ログインできないようにする
+          ログインできないようにする（LINEの連携とパスワードを消します）
         </label>
       )}
     </details>
@@ -74,7 +76,10 @@ export default async function StaffPage({
       {pending.map((s) => (
         <form key={s.id} action={reviewStaffAction} className="card">
           <input type="hidden" name="id" value={s.id} />
-          <h2 style={{ marginTop: 0 }}>登録の申請：{s.name}</h2>
+          <h2 style={{ marginTop: 0 }}>
+            登録の申請：{s.name}
+            {s.lineUserId && <span className="muted">（LINEで申請）</span>}
+          </h2>
           <p className="muted">承認すると、このスタッフは予約の確認と来店チェックができるようになります。バック率は承認後に下で設定してください。</p>
           <div className="row">
             <button type="submit" name="op" value="approve" className="primary">
@@ -90,7 +95,7 @@ export default async function StaffPage({
       <section className="card">
         <h2 style={{ marginTop: 0 }}>スタッフに自分で登録してもらう</h2>
         <p className="muted">
-          登録用リンクをLINEなどでスタッフに送ると、スタッフが自分の名前とパスワードを登録できます。あなたが承認するとログインできるようになります。
+          登録用リンクをLINEなどでスタッフに送ると、スタッフが「LINEで登録」（または名前とパスワードで登録）できます。あなたが承認すると、スタッフのログイン画面からログインできるようになります。
         </p>
         {settings.staffInviteCode ? (
           <>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { appBaseUrl, instagramClient, lineClient, repository, reservationService } from "@/lib/container";
 import { availabilityPost, seatMark } from "@/lib/domain/post";
 import { addDays, isValidDate, toJst, weekdayJa } from "@/lib/domain/time";
@@ -24,7 +24,7 @@ export default async function PostPage({
 }: {
   searchParams: Promise<{ date?: string; to?: string; saved?: string; sent?: string; error?: string }>;
 }) {
-  await requireAdmin();
+  await requireStaff();
   const now = toJst(new Date());
   const today = now.time < "06:00" ? addDays(now.date, -1) : now.date;
   const { date: param, to, saved, sent, error } = await searchParams;

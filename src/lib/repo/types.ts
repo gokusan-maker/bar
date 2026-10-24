@@ -61,8 +61,8 @@ export interface ReservationQuery {
  * 永続化の抽象。開発・テスト用のメモリ実装と、本番用のSupabase実装がある。
  */
 /** ログイン関係は省略するとログインなし */
-export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending"> &
-  Partial<Pick<Staff, "passwordHash" | "pending">>;
+export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending" | "lineUserId"> &
+  Partial<Pick<Staff, "passwordHash" | "pending" | "lineUserId">>;
 
 export type CustomerPatch = Partial<
   Pick<Customer, "name" | "note" | "displayName" | "staffId" | "phone" | "birthday" | "tags" | "birthdayGreetedYear">

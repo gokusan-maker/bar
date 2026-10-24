@@ -9,6 +9,7 @@ const staff = (id: string, rates: Partial<Staff["backRates"]> = {}, active = tru
   active,
   passwordHash: null,
   pending: false,
+  lineUserId: null,
   createdAt: "",
 });
 

@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
 import { repository, salesService } from "@/lib/container";
 import { addDays, toJst } from "@/lib/domain/time";
@@ -11,7 +11,7 @@ export default async function NewSalePage({
 }: {
   searchParams: Promise<{ reservationId?: string; error?: string; orders?: string }>;
 }) {
-  await requireAdmin();
+  await requireStaff();
   const { reservationId, error, orders: orderParam } = await searchParams;
   const repo = repository();
   const [settings, staff, allCustomers] = await Promise.all([

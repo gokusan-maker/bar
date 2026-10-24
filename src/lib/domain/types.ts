@@ -176,6 +176,8 @@ export interface ShopSettings {
   promoImageKey: string;
   /** 最後に配信した営業日（同じ日に二重に送らないため） */
   promoLastSentDate: string;
+  /** LINEでログインできる店主のLINEユーザーID（設定画面で連携） */
+  ownerLineUserIds: string[];
   /** 誕生日の当日にLINEでお祝いを送る */
   birthdayGreetingEnabled: boolean;
   /** お祝いの文。{name} がお名前に置き換わる */
@@ -222,6 +224,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   promoInstagram: false,
   promoImageKey: "",
   promoLastSentDate: "",
+  ownerLineUserIds: [],
   birthdayGreetingEnabled: false,
   birthdayMessage: "{name}様、お誕生日おめでとうございます🎂\n素敵な1年になりますように。今月ご来店の際は、お祝いに1杯サービスいたします🥂",
 };
@@ -241,6 +244,8 @@ export interface Staff {
   passwordHash: string | null;
   /** 招待リンクから登録し、店主の承認を待っている */
   pending: boolean;
+  /** LINEでログインするためのLINEユーザーID（LINEログインで確認したもの） */
+  lineUserId: string | null;
   createdAt: string;
 }
 

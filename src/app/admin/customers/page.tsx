@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { CUSTOMER_SORTS, customerList, type CustomerListParams } from "@/lib/customer-list";
 import { birthdayLabel, phoneLabel } from "@/lib/domain/customers";
 import { yen } from "@/lib/domain/sales";
@@ -7,12 +7,14 @@ import { toJst } from "@/lib/domain/time";
 import { CHANNEL_LABEL } from "../ui";
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<CustomerListParams> }) {
-  await requireAdmin();
+  const owner = (await requireStaff()) === "owner";
   const p = await searchParams;
   const { rows, total, tags, staff } = await customerList(p);
   const staffName = new Map(staff.map((s) => [s.id, s.name]));
   const thisMonth = toJst(new Date()).date.slice(5, 7);
-  const query = new URLSearchParams(Object.entries(p).filter(([k, v]) => v && k !== "saved") as [string, string][]).toString();
+  const query = new URLSearchParams(
+    Object.entries(p).filter(([k, v]) => v && k !== "saved") as [string, string][],
+  ).toString();
 
   return (
     <>
@@ -24,7 +26,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       </div>
       <form className="card" style={{ marginTop: 12 }}>
         <div className="row">
-          <input name="q" defaultValue={p.q} placeholder="名前・電話番号で検索" aria-label="名前・電話番号で検索" style={{ flex: 2, minWidth: 160 }} />
+          <input
+            name="q"
+            defaultValue={p.q}
+            placeholder="名前・電話番号で検索"
+            aria-label="名前・電話番号で検索"
+            style={{ flex: 2, minWidth: 160 }}
+          />
           <select name="sort" defaultValue={p.sort ?? "recent"} aria-label="並び順" style={{ flex: 1, minWidth: 140 }}>
             {Object.entries(CUSTOMER_SORTS).map(([key, s]) => (
               <option key={key} value={key}>
@@ -34,7 +42,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           </select>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
-          <select name="channel" defaultValue={p.channel ?? ""} aria-label="集客経路" style={{ flex: 1, minWidth: 120 }}>
+          <select
+            name="channel"
+            defaultValue={p.channel ?? ""}
+            aria-label="集客経路"
+            style={{ flex: 1, minWidth: 120 }}
+          >
             <option value="">すべての経路</option>
             {(["line", "instagram", "x", "web", "manual"] as const).map((c) => (
               <option key={c} value={c}>
@@ -98,14 +111,16 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         <p className="muted" style={{ margin: 0 }}>
           {rows.length}人{rows.length !== total && `（全${total}人中）`}
         </p>
-        <div className="row">
-          <Link className="button" href={`/print/customers${query ? `?${query}` : ""}`}>
-            PDF（印刷）
-          </Link>
-          <a className="button" href="/api/export?kind=customers">
-            CSV
-          </a>
-        </div>
+        {owner && (
+          <div className="row">
+            <Link className="button" href={`/print/customers${query ? `?${query}` : ""}`}>
+              PDF（印刷）
+            </Link>
+            <a className="button" href="/api/export?kind=customers">
+              CSV
+            </a>
+          </div>
+        )}
       </div>
       <section className="card">
         {rows.length === 0 ? (
@@ -115,7 +130,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             {rows.map((s) => (
               <li key={s.customer.id}>
                 <div className="row spread">
-                  <Link href={`/admin/customers/${s.customer.id}`}>{s.customer.name ?? s.customer.displayName ?? "名前未設定"}</Link>
+                  <Link href={`/admin/customers/${s.customer.id}`}>
+                    {s.customer.name ?? s.customer.displayName ?? "名前未設定"}
+                  </Link>
                   <span className="muted">
                     {CHANNEL_LABEL[s.customer.channel]}
                     {s.customer.staffId && ` ・ 担当 ${staffName.get(s.customer.staffId) ?? ""}`}

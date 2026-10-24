@@ -1,11 +1,11 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { repository } from "@/lib/container";
 import { createCustomerAction } from "../../customer-actions";
 import { CHANNEL_LABEL } from "../../ui";
 import { ProfileFields } from "../profile-fields";
 
 export default async function NewCustomerPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  await requireAdmin();
+  await requireStaff();
   const { error } = await searchParams;
   const staff = (await repository().listStaff()).filter((s) => s.active && !s.pending);
   return (

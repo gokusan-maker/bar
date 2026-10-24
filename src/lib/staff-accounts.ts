@@ -68,13 +68,57 @@ export async function registerStaff(
   return { ok: true, staff: created };
 }
 
-/** スタッフ本人のログイン。承認済み・在籍中・パスワードありのスタッフだけ */
+/** スタッフ本人のパスワードでのログイン。承認済み・在籍中・パスワードありのスタッフだけ */
 export async function authenticateStaff(repo: Repository, name: string, password: string): Promise<Staff | null> {
   const key = normalizeStaffName(name);
   if (!key) return null;
-  const s = (await repo.listStaff()).find((x) => normalizeStaffName(x.name) === key);
-  if (!s || !canLogin(s)) return null;
-  return verifyPassword(password, s.passwordHash) ? s : null;
+  // LINEだけで登録した同じ名前のスタッフがいても、パスワードのある人で確かめる
+  const candidates = (await repo.listStaff()).filter((x) => normalizeStaffName(x.name) === key && canLogin(x) && x.passwordHash);
+  return candidates.find((s) => verifyPassword(password, s.passwordHash)) ?? null;
 }
 
-export const canLogin = (s: Staff) => s.active && !s.pending && !!s.passwordHash;
+/** ログインできる状態か（パスワードかLINEのどちらかで） */
+export const canLogin = (s: Staff) => s.active && !s.pending && !!(s.passwordHash || s.lineUserId);
+
+/**
+ * 招待リンクからLINEで登録する。名前はLINEの表示名（店主があとで変えられる）。
+ * 店主が先に同じ名前で登録していたスタッフ（ログインなし）には、そのままLINEを付ける。
+ */
+export async function registerStaffWithLine(
+  repo: Repository,
+  input: { code: string; lineUserId: string; name: string; ownerLineUserIds: string[] },
+): Promise<RegisterResult> {
+  if (!(await isValidInviteCode(repo, input.code))) {
+    return { ok: false, error: "このリンクは使えません。店主に新しいリンクをもらってください" };
+  }
+  if (input.ownerLineUserIds.includes(input.lineUserId)) return { ok: false, error: "このLINEは店主として登録されています" };
+  const staff = await repo.listStaff();
+  const mine = staff.find((s) => s.lineUserId === input.lineUserId);
+  if (mine) {
+    return { ok: false, error: mine.pending ? "登録の申請は受け付け済みです。店主の承認をお待ちください" : "このLINEはすでに登録されています。ログイン画面からLINEでログインしてください" };
+  }
+  if (staff.filter((s) => s.pending).length >= MAX_PENDING) {
+    return { ok: false, error: "承認待ちの申請が多いため受け付けられません。店主に連絡してください" };
+  }
+  const name = input.name.trim().slice(0, 30) || "スタッフ";
+  const key = normalizeStaffName(name);
+  const existing = staff.find((s) => normalizeStaffName(s.name) === key && !s.passwordHash && !s.lineUserId && !s.pending);
+  const created = existing
+    ? await repo.updateStaff(existing.id, { lineUserId: input.lineUserId, pending: true })
+    : await repo.createStaff({ name, backRates: { rate: 0, perVisit: 0 }, active: true, lineUserId: input.lineUserId, pending: true });
+  return { ok: true, staff: created };
+}
+
+/** ログイン中のスタッフが、自分のアカウントにLINEを連携する */
+export async function linkStaffLine(
+  repo: Repository,
+  staffId: string,
+  lineUserId: string,
+  ownerLineUserIds: string[],
+): Promise<string | null> {
+  if (ownerLineUserIds.includes(lineUserId)) return "このLINEは店主として登録されています";
+  const other = (await repo.listStaff()).find((s) => s.lineUserId === lineUserId && s.id !== staffId);
+  if (other) return "このLINEはほかのスタッフに連携されています";
+  await repo.updateStaff(staffId, { lineUserId });
+  return null;
+}
