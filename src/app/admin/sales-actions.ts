@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { currentActor, requireAdmin, requireStaff } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { repository, salesService } from "@/lib/container";
 import { saleTotal } from "@/lib/domain/sales";
 import type { AuditLog, Channel } from "@/lib/domain/types";
 import { validateBackRates, type SaleInput } from "@/lib/sales-service";
+import { hashPassword } from "@/lib/password";
+import { loginIdProblem, loginIdTaken, newInviteCode, normalizeLoginId, normalizeStaffName, passwordProblem } from "@/lib/staff-accounts";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 /** "6,000" や "６０００" も受け付ける。空欄は0 */
@@ -24,7 +26,8 @@ function go(path: string, params: Record<string, string> = {}): never {
 }
 
 async function audit(action: string, targetType: AuditLog["targetType"], targetId: string | null, detail: string | null = null) {
-  await recordAudit({ actor: "owner", action, targetType, targetId, detail });
+  const { actor, name } = await currentActor();
+  await recordAudit({ actor, action, targetType, targetId, detail: name ? `${detail ?? ""}［${name}］` : detail });
 }
 
 function filesFrom(formData: FormData): File[] {
@@ -47,7 +50,7 @@ async function saveFiles(saleId: string, files: File[]): Promise<string[]> {
 }
 
 export async function saveSaleAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const id = str(formData, "id");
   const channel = str(formData, "channel") as Channel;
   const input: SaleInput = {
@@ -69,6 +72,7 @@ export async function saveSaleAction(formData: FormData) {
     go(id ? `/admin/sales/${id}` : "/admin/sales/new", {
       error: result.error,
       ...(input.reservationId ? { reservationId: input.reservationId } : {}),
+      ...(str(formData, "orderIds") ? { orders: str(formData, "orderIds") } : {}),
     });
   }
   await audit(
@@ -77,6 +81,14 @@ export async function saveSaleAction(formData: FormData) {
     result.value.id,
     `${result.value.businessDate} ${result.value.customerName ?? ""} 合計${saleTotal(result.value)}円`,
   );
+  // QRコード注文の会計から登録した場合、注文に売上を結びつける（二重に取り込まないように）
+  if (!id) {
+    const repo = repository();
+    for (const orderId of str(formData, "orderIds").split(",").filter(Boolean).slice(0, 100)) {
+      const order = await repo.getOrder(orderId);
+      if (order && !order.saleId && order.status !== "cancelled") await repo.updateOrder(orderId, { saleId: result.value.id });
+    }
+  }
   const errors = await saveFiles(result.value.id, filesFrom(formData));
   go(`/admin/sales/${result.value.id}`, errors.length ? { error: errors.join(" / ") } : { saved: "1" });
 }
@@ -91,14 +103,14 @@ export async function deleteSaleAction(formData: FormData) {
 }
 
 export async function uploadEvidenceAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const saleId = str(formData, "saleId");
   const errors = await saveFiles(saleId, filesFrom(formData));
   go(`/admin/sales/${saleId}`, errors.length ? { error: errors.join(" / ") } : { saved: "1" });
 }
 
 export async function deleteAttachmentAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const attachmentId = str(formData, "attachmentId");
   const saleId = str(formData, "saleId");
   // 履歴用のファイル名はメタ情報から取る（本体はダウンロードしない）
@@ -114,24 +126,76 @@ export async function saveStaffAction(formData: FormData) {
   const name = str(formData, "name");
   const pct = (k: string) => Number(str(formData, k).normalize("NFKC") || "0");
   const backRates = {
-    drink: pct("drink"),
-    charge: pct("charge"),
-    service: pct("service"),
+    rate: pct("rate"),
     perVisit: yenField(formData, "perVisit"),
   };
   if (!name) go("/admin/staff", { error: "名前を入力してください" });
   const invalid = validateBackRates(backRates);
   if (invalid) go("/admin/staff", { error: invalid });
   const repo = repository();
-  const rates = `お酒${backRates.drink}% 料金${backRates.charge}% サービス料${backRates.service}% 固定${backRates.perVisit}円`;
+  const rates = `売上全体の${backRates.rate}% 固定${backRates.perVisit}円`;
+  // 店主がログイン用パスワードを決める場合（空なら変えない）
+  const password = String(formData.get("password") ?? "");
+  const disableLogin = formData.get("disableLogin") === "on";
+  if (password) {
+    const problem = passwordProblem(password);
+    if (problem) go("/admin/staff", { error: problem });
+    const key = normalizeStaffName(name);
+    const clash = (await repo.listStaff()).some((s) => s.id !== id && (s.passwordHash || s.pending) && normalizeStaffName(s.name) === key);
+    if (clash) go("/admin/staff", { error: `「${name}」はほかのスタッフがログインに使っています。名前を変えてください` });
+  }
+  // ログインID（空なら消す）
+  const loginIdInput = normalizeLoginId(str(formData, "loginId"));
+  if (loginIdInput) {
+    const problem = loginIdProblem(loginIdInput);
+    if (problem) go("/admin/staff", { error: problem });
+    if (await loginIdTaken(repo, loginIdInput, id || undefined)) go("/admin/staff", { error: `ログインID「${loginIdInput}」はすでに使われています` });
+  }
+  const loginId = loginIdInput || null;
+  const login = disableLogin
+    ? { passwordHash: null, lineUserId: null, pending: false }
+    : password
+      ? { passwordHash: hashPassword(password), pending: false }
+      : {};
+  const loginNote = disableLogin ? "（ログインを止めた）" : password ? "（パスワードを設定）" : "";
   if (id) {
-    await repo.updateStaff(id, { name, backRates, active: formData.get("active") === "on" });
-    await audit("スタッフを更新", "staff", id, `${name} ${rates}`);
+    await repo.updateStaff(id, { name, backRates, active: formData.get("active") === "on", loginId, ...login });
+    await audit("スタッフを更新", "staff", id, `${name} ${rates}${loginNote}`);
   } else {
-    const created = await repo.createStaff({ name, backRates, active: true });
-    await audit("スタッフを追加", "staff", created.id, `${name} ${rates}`);
+    const created = await repo.createStaff({ name, backRates, active: true, passwordHash: null, pending: false, loginId, ...login });
+    await audit("スタッフを追加", "staff", created.id, `${name} ${rates}${loginNote}`);
   }
   go("/admin/staff", { saved: "1" });
+}
+
+/** 招待リンクからの登録申請を承認・却下する */
+export async function reviewStaffAction(formData: FormData) {
+  await requireAdmin();
+  const id = str(formData, "id");
+  const repo = repository();
+  const s = await repo.getStaff(id);
+  if (!s?.pending) go("/admin/staff");
+  if (str(formData, "op") === "approve") {
+    await repo.updateStaff(id, { pending: false, active: true });
+    await audit("スタッフ登録を承認", "staff", id, s.name);
+    go("/admin/staff", { saved: "approved" });
+  }
+  // 却下：パスワードを消す。バック率が未設定（申請で新しく作られた）なら在籍も外して選択肢に出さない
+  const unset = s.backRates.rate === 0 && s.backRates.perVisit === 0;
+  await repo.updateStaff(id, { pending: false, passwordHash: null, lineUserId: null, ...(unset ? { active: false } : {}) });
+  await audit("スタッフ登録を却下", "staff", id, s.name);
+  go("/admin/staff", { saved: "rejected" });
+}
+
+/** 招待リンクを作る・作り直す・止める */
+export async function staffInviteAction(formData: FormData) {
+  await requireAdmin();
+  const repo = repository();
+  const settings = await repo.getSettings();
+  const stop = str(formData, "op") === "stop";
+  await repo.saveSettings({ ...settings, staffInviteCode: stop ? "" : newInviteCode() });
+  await audit(stop ? "スタッフ招待リンクを停止" : "スタッフ招待リンクを発行", "settings", null);
+  go("/admin/staff", { saved: stop ? "invite-stopped" : "invite" });
 }
 
 export async function setCustomerStaffAction(formData: FormData) {

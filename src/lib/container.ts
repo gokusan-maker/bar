@@ -4,12 +4,14 @@ import { RuleBasedExtractor } from "./extraction/rule-based";
 import { GoogleCalendarSync, type GoogleOAuthConfig } from "./integrations/google-calendar";
 import { InstagramClient } from "./integrations/instagram";
 import { LineClient } from "./integrations/line";
+import type { LineLoginConfig } from "./integrations/line-login";
 import { noopCalendar, type CalendarSync, type Messenger, type Notifier } from "./ports";
 import { canMessage } from "./domain/types";
 import { MemoryRepository } from "./repo/memory";
 import { SupabaseRepository } from "./repo/supabase";
 import type { Repository } from "./repo/types";
 import { ReservationService } from "./reservation-service";
+import { PromoService } from "./promo-service";
 import { SalesService } from "./sales-service";
 
 const env = (name: string) => process.env[name]?.trim() || undefined;
@@ -29,6 +31,15 @@ export function googleOAuthConfig(): GoogleOAuthConfig | null {
 export function lineClient(): LineClient | null {
   const token = env("LINE_CHANNEL_ACCESS_TOKEN");
   return token ? new LineClient(token) : null;
+}
+
+/** LINEログイン（LINE_LOGIN_CHANNEL_ID・LINE_LOGIN_CHANNEL_SECRET・APP_BASE_URL がそろったとき） */
+export function lineLoginConfig(): LineLoginConfig | null {
+  const channelId = env("LINE_LOGIN_CHANNEL_ID");
+  const channelSecret = env("LINE_LOGIN_CHANNEL_SECRET");
+  const base = appBaseUrl();
+  if (!channelId || !channelSecret || !base) return null;
+  return { channelId, channelSecret, redirectUri: `${base}/api/line-login/callback` };
 }
 
 export function instagramClient(): InstagramClient | null {
@@ -80,7 +91,8 @@ function messenger(): Messenger {
   };
 }
 
-function notifier(): Notifier {
+/** 店主への通知（LINE）。OWNER_LINE_USER_ID がなければログに出すだけ */
+export function notifier(): Notifier {
   const line = lineClient();
   const owner = env("OWNER_LINE_USER_ID");
   return {
@@ -106,6 +118,18 @@ export function reservationService(): ReservationService {
     calendar: calendar(repo),
     messenger: messenger(),
     notifier: notifier(),
+  });
+}
+
+export function promoService(): PromoService {
+  const service = reservationService();
+  return new PromoService({
+    repo: repository(),
+    availabilityBoard: (date) => service.availabilityBoard(date),
+    line: lineClient(),
+    instagram: instagramClient(),
+    notify: (text) => notifier().notify(text),
+    baseUrl: appBaseUrl(),
   });
 }
 

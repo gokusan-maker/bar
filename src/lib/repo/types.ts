@@ -1,5 +1,10 @@
 import type {
   Attachment,
+  MenuItem,
+  Order,
+  OrderLine,
+  OrderStatus,
+  OrderTable,
   AuditLog,
   Channel,
   Customer,
@@ -55,6 +60,22 @@ export interface ReservationQuery {
 /**
  * 永続化の抽象。開発・テスト用のメモリ実装と、本番用のSupabase実装がある。
  */
+/** ログイン関係は省略するとログインなし */
+export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending" | "lineUserId" | "loginId"> &
+  Partial<Pick<Staff, "passwordHash" | "pending" | "lineUserId" | "loginId">>;
+
+export type CustomerPatch = Partial<
+  Pick<Customer, "name" | "note" | "displayName" | "staffId" | "phone" | "birthday" | "tags" | "birthdayGreetedYear">
+>;
+
+export interface OrderQuery {
+  /** この時刻以降に作られた注文 */
+  since?: Date;
+  tableId?: string;
+  status?: OrderStatus;
+  limit?: number;
+}
+
 export interface Repository {
   getSettings(): Promise<ShopSettings>;
   saveSettings(settings: ShopSettings): Promise<void>;
@@ -69,11 +90,11 @@ export interface Repository {
   ): Promise<Customer>;
   getCustomer(id: string): Promise<Customer | null>;
   /** 名前・表示名で検索（新しい順）。search が空なら全件 */
+  /** search は名前・表示名・電話番号の部分一致 */
   listCustomers(query: { search?: string; limit: number }): Promise<Customer[]>;
-  updateCustomer(
-    id: string,
-    patch: Partial<Pick<Customer, "name" | "note" | "displayName" | "staffId">>,
-  ): Promise<void>;
+  /** 店で直接登録するお客様（SNSのIDなし） */
+  createCustomer(input: Pick<Customer, "channel" | "name" | "phone" | "birthday" | "tags" | "note" | "staffId">): Promise<Customer>;
+  updateCustomer(id: string, patch: CustomerPatch): Promise<void>;
 
   addMessage(entry: Omit<MessageLog, "id" | "createdAt">): Promise<MessageLog>;
   /** 新しい順ではなく古い順で返す */
@@ -94,7 +115,7 @@ export interface Repository {
 
   listStaff(): Promise<Staff[]>;
   getStaff(id: string): Promise<Staff | null>;
-  createStaff(input: Omit<Staff, "id" | "createdAt">): Promise<Staff>;
+  createStaff(input: NewStaff): Promise<Staff>;
   updateStaff(id: string, patch: Partial<Omit<Staff, "id" | "createdAt">>): Promise<Staff>;
 
   createSale(input: NewSale): Promise<Sale>;
@@ -118,6 +139,27 @@ export interface Repository {
 
   /** cutoff より古い個人情報を削除・匿名化する（売上の金額・証拠は残す） */
   purgePersonalData(cutoff: Date): Promise<PurgeResult>;
+
+  /** 並び順（sortOrder・作成順） */
+  listMenu(): Promise<MenuItem[]>;
+  createMenuItem(input: Omit<MenuItem, "id" | "createdAt">): Promise<MenuItem>;
+  updateMenuItem(id: string, patch: Partial<Omit<MenuItem, "id" | "createdAt">>): Promise<MenuItem>;
+  deleteMenuItem(id: string): Promise<void>;
+
+  listOrderTables(): Promise<OrderTable[]>;
+  getOrderTableByToken(token: string): Promise<OrderTable | null>;
+  createOrderTable(input: Omit<OrderTable, "id" | "createdAt">): Promise<OrderTable>;
+  updateOrderTable(id: string, patch: Partial<Omit<OrderTable, "id" | "createdAt">>): Promise<OrderTable>;
+
+  createOrder(input: { tableId: string; tableName: string; lines: OrderLine[]; total: number; note: string | null }): Promise<Order>;
+  getOrder(id: string): Promise<Order | null>;
+  /** 新しい順 */
+  listOrders(query: OrderQuery): Promise<Order[]>;
+  updateOrder(id: string, patch: Partial<Pick<Order, "status" | "saleId">>): Promise<Order>;
+
+  /** 集客投稿の画像（Instagramが読みに来るので公開URLで配る） */
+  savePromoImage(key: string, data: Uint8Array, contentType: string): Promise<void>;
+  getPromoImage(key: string): Promise<{ data: Uint8Array; contentType: string } | null>;
 
   addAudit(entry: Omit<AuditLog, "id" | "createdAt">): Promise<void>;
   /** 新しい順 */

@@ -3,7 +3,7 @@ import { summarizeCustomers } from "./customers";
 import type { Customer, Reservation, Sale } from "./types";
 
 const customer = (id: string): Customer => ({
-  id, channel: "line", externalId: id, displayName: id, name: null, note: null, staffId: null, createdAt: "",
+  id, channel: "line", externalId: id, displayName: id, name: null, note: null, staffId: null, phone: null, birthday: null, tags: [], birthdayGreetedYear: null, createdAt: "",
 });
 const res = (customerId: string, status: Reservation["status"], startAt: string): Reservation => ({
   id: `${customerId}-${startAt}`, customerId, startAt, endAt: startAt, partySize: 2, name: "x", notes: null,
@@ -31,5 +31,38 @@ describe("summarizeCustomers", () => {
   it("returns empty stats for new customers", () => {
     const [b] = summarizeCustomers([customer("b")], [], [], () => "", new Date());
     expect(b).toMatchObject({ visits: 0, lastVisit: null, totalSpend: 0 });
+  });
+});
+
+describe("customer profile helpers", () => {
+  it("parses tags, birthdays and phone numbers", async () => {
+    const { parseTags, parseBirthday, parsePhone, phoneLabel } = await import("./customers");
+    expect(parseTags("常連, VIP、ワイン好き 常連 #ＶＩＰ")).toEqual(["常連", "VIP", "ワイン好き"]);
+    expect(parseBirthday("5/3")).toBe("05-03");
+    expect(parseBirthday("1990/12/31")).toBe("12-31");
+    expect(parseBirthday("2月29日")).toBe("02-29");
+    expect(parseBirthday("2/30")).toBeNull();
+    expect(parseBirthday("")).toBeNull();
+    expect(parsePhone("090-1234-5678")).toBe("09012345678");
+    expect(parsePhone("０３（１２３４）５６７８")).toBe("0312345678");
+    expect(parsePhone("1234")).toBeNull();
+    expect(phoneLabel("09012345678")).toBe("090-1234-5678");
+    expect(phoneLabel("0312345678")).toBe("03-1234-5678");
+  });
+});
+
+describe("filterCustomers", () => {
+  it("filters by tag, birthday month and lapsed visits", async () => {
+    const { filterCustomers } = await import("./customers");
+    const row = (id: string, over: Partial<Customer>, lastVisit: string | null) => ({ customer: { ...customer(id), ...over }, lastVisit });
+    const rows = [
+      row("a", { tags: ["VIP"], birthday: "10-30" }, "2026-06-01"),
+      row("b", { tags: [] , birthday: "05-03" }, "2026-10-20"),
+      row("c", {}, null),
+    ];
+    expect(filterCustomers(rows, { tag: "VIP" }).map((r) => r.customer.id)).toEqual(["a"]);
+    expect(filterCustomers(rows, { birthdayMonth: "05" }).map((r) => r.customer.id)).toEqual(["b"]);
+    // 来店したことのないお客様は「ご無沙汰」に含めない
+    expect(filterCustomers(rows, { lastVisitBefore: "2026-08-25" }).map((r) => r.customer.id)).toEqual(["a"]);
   });
 });

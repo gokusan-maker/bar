@@ -6,6 +6,7 @@ import { currentRole, logout, requireAdmin, requireStaff } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { repository, reservationService } from "@/lib/container";
 import { isThemeKey } from "@/lib/domain/theme";
+import { loginIdProblem, normalizeLoginId } from "@/lib/staff-accounts";
 import type { ShopSettings } from "@/lib/domain/types";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -111,7 +112,9 @@ export async function saveSettingsAction(formData: FormData) {
   const backTarget = str(formData, "backTarget");
   const rate = Number(str(formData, "serviceChargeRate"));
 
+  // この画面にない項目（注文・集客・招待リンクなど）はそのまま残す
   const settings: ShopSettings = {
+    ...current,
     shopName: str(formData, "shopName") || current.shopName,
     shopType: str(formData, "shopType") || current.shopType,
     seatAreas,
@@ -150,6 +153,28 @@ export async function saveSettingsAction(formData: FormData) {
   back("/admin/settings", { saved: "1" });
 }
 
+/** オーナーのログインID（パスワードは ADMIN_PASSWORD のまま） */
+export async function saveOwnerLoginIdAction(formData: FormData) {
+  await requireAdmin();
+  const id = normalizeLoginId(str(formData, "ownerLoginId"));
+  const problem = loginIdProblem(id);
+  if (problem) back("/admin/settings", { error: problem });
+  const repo = repository();
+  if ((await repo.listStaff()).some((s) => s.loginId === id)) back("/admin/settings", { error: "このIDはスタッフが使っています" });
+  await repo.saveSettings({ ...(await repo.getSettings()), ownerLoginId: id });
+  await recordAudit({ actor: "owner", action: "オーナーのログインIDを変更", targetType: "settings", targetId: null, detail: id });
+  back("/admin/settings", { saved: "1" });
+}
+
+/** オーナーのLINEログインの連携を外す（パスワードでのログインは残る） */
+export async function unlinkOwnerLineAction() {
+  await requireAdmin();
+  const repo = repository();
+  await repo.saveSettings({ ...(await repo.getSettings()), ownerLineUserIds: [] });
+  await recordAudit({ actor: "owner", action: "店主のLINEログインの連携を解除", targetType: "settings", targetId: null, detail: null });
+  back("/admin/settings", { line: "unlinked" });
+}
+
 export async function saveCalendarAction(formData: FormData) {
   await requireAdmin();
   const repo = repository();
@@ -174,7 +199,7 @@ export async function disconnectGoogleAction() {
 }
 
 export async function manualReplyAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const customerId = str(formData, "customerId");
   const text = str(formData, "text");
   if (text) {
@@ -185,13 +210,6 @@ export async function manualReplyAction(formData: FormData) {
     }
   }
   back(`/admin/customers/${customerId}`);
-}
-
-export async function saveCustomerNoteAction(formData: FormData) {
-  await requireAdmin();
-  const customerId = str(formData, "customerId");
-  await repository().updateCustomer(customerId, { note: str(formData, "note") || null });
-  back(`/admin/customers/${customerId}`, { saved: "1" });
 }
 
 export async function simulatorSendAction(formData: FormData) {
@@ -210,6 +228,7 @@ export async function simulatorSendAction(formData: FormData) {
 }
 
 export async function logoutAction() {
+  const role = await currentRole();
   await logout();
-  redirect("/login");
+  redirect(role === "owner" ? "/owner/login" : "/login");
 }

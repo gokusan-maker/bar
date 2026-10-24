@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { authMode, requireStaff } from "@/lib/auth";
+import { authMode, currentSession, requireStaff } from "@/lib/auth";
 import { googleOAuthConfig, isMemoryMode } from "@/lib/container";
 import { logoutAction } from "./actions";
 import { TabBar } from "./tabbar";
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const role = await requireStaff();
   const owner = role === "owner";
+  const staffName = owner ? null : (await currentSession())?.staffName;
   const warnings = !owner ? [] : [
     isMemoryMode() && "データベース未接続のため、データはメモリに保存されています（再起動で消えます）。",
     authMode() === "open-dev" && "ADMIN_PASSWORD 未設定のため、ログインなしで表示しています（開発モード）。",
@@ -19,12 +20,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <>
       <nav className="nav">
         <div className="nav-inner">
-          <strong>予約管理{owner ? "" : "（スタッフ）"}</strong>
+          <strong>{owner ? "オーナー管理画面" : `スタッフ画面（${staffName ?? "スタッフ"}）`}</strong>
           <Link href="/admin">予約一覧</Link>
+          <Link href="/admin/orders">注文</Link>
+          {!owner && (
+            <>
+              <Link href="/admin/post">集客</Link>
+              <Link href="/admin/sales/new">売上の入力</Link>
+              <Link href="/admin/sales">売上一覧</Link>
+              <Link href="/admin/customers">お客様</Link>
+              <Link href="/admin/inbox">メッセージ</Link>
+              <Link href="/admin/account">アカウント</Link>
+            </>
+          )}
           {owner && (
             <>
               <Link href="/admin/new">手動登録</Link>
               <Link href="/admin/post">空き投稿</Link>
+              <Link href="/admin/menu">メニュー</Link>
               <Link href="/admin/sales">売上・バック</Link>
               <Link href="/admin/customers">お客様</Link>
               <Link href="/admin/inbox">メッセージ</Link>
@@ -43,7 +56,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           )}
         </div>
       </nav>
-      <main className={`container${owner ? " with-tabbar" : ""}`}>
+      <main className="container with-tabbar">
         {warnings.length > 0 && (
           <details className="notice">
             <summary>セットアップが未完了の項目があります（{warnings.length}件）</summary>
@@ -59,7 +72,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         )}
         {children}
       </main>
-      {owner && <TabBar />}
+      <TabBar owner={owner} />
     </>
   );
 }

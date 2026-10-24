@@ -1,9 +1,17 @@
 import { requireAdmin } from "@/lib/auth";
-import { appBaseUrl, googleOAuthConfig, repository } from "@/lib/container";
+import { appBaseUrl, googleOAuthConfig, lineLoginConfig, repository } from "@/lib/container";
+import { LineLoginButton } from "../../login/line-button";
 import { weekdayJa } from "@/lib/domain/time";
 import { THEMES } from "@/lib/domain/theme";
 import { listCalendars } from "@/lib/integrations/google-calendar";
-import { disconnectGoogleAction, pullCalendarAction, saveCalendarAction, saveSettingsAction } from "../actions";
+import {
+  disconnectGoogleAction,
+  pullCalendarAction,
+  saveCalendarAction,
+  saveOwnerLoginIdAction,
+  saveSettingsAction,
+  unlinkOwnerLineAction,
+} from "../actions";
 
 const SHOP_TYPES = ["バー", "ダーツバー", "スナック", "ガールズバー", "コンセプトカフェ", "ラウンジ", "居酒屋", "カラオケバー"];
 const EMPTY_AREAS = Array.from({ length: 3 }, () => ({ name: "", seats: 0 }));
@@ -17,10 +25,10 @@ const GOOGLE_MESSAGES: Record<string, { text: string; className: string }> = {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; google?: string; error?: string; pulled?: string }>;
+  searchParams: Promise<{ saved?: string; google?: string; error?: string; pulled?: string; line?: string }>;
 }) {
   await requireAdmin();
-  const { saved, google, error, pulled } = await searchParams;
+  const { saved, google, error, pulled, line } = await searchParams;
   const [moved, deleted, failed] = (pulled ?? "").split("-").map(Number);
   const repo = repository();
   const [s, integration] = await Promise.all([repo.getSettings(), repo.getGoogleIntegration()]);
@@ -48,6 +56,36 @@ export default async function SettingsPage({
       </div>
       {saved && <p className="notice success">保存しました</p>}
       {error && <p className="notice error">{error}</p>}
+      {line === "linked" && <p className="notice success">LINEを連携しました。次からはオーナーのログイン画面で「LINEでログイン」できます。</p>}
+      {line === "unlinked" && <p className="notice success">LINEの連携を外しました。</p>}
+      {line === "staff_conflict" && <p className="notice error">このLINEはスタッフとして登録されています。オーナー用には別のLINEアカウントを使ってください。</p>}
+
+      <section className="card">
+        <h2 style={{ marginTop: 0 }}>オーナーのログイン</h2>
+        <form action={saveOwnerLoginIdAction} className="row" style={{ alignItems: "flex-end" }}>
+          <label style={{ flex: 1, marginBottom: 0 }}>
+            ログインID（パスワードは環境変数 ADMIN_PASSWORD）
+            <input name="ownerLoginId" required defaultValue={s.ownerLoginId || "admin"} autoCapitalize="none" spellCheck={false} maxLength={30} />
+          </label>
+          <button type="submit">IDを保存</button>
+        </form>
+        <p className="muted">
+          連携すると、オーナーのログイン画面（{base}/owner/login）で「LINEでログイン」できます。スタッフは {base}/login からログインします。
+        </p>
+        <p>連携しているLINE：{s.ownerLineUserIds.length}件</p>
+        {lineLoginConfig() ? (
+          <div className="row">
+            <LineLoginButton purpose="link-owner" label="LINEでログインできるようにする" />
+            {s.ownerLineUserIds.length > 0 && (
+              <form action={unlinkOwnerLineAction}>
+                <button type="submit">LINEの連携をすべて外す</button>
+              </form>
+            )}
+          </div>
+        ) : (
+          <p className="notice">LINEログインのチャネルが未設定です（LINE_LOGIN_CHANNEL_ID・LINE_LOGIN_CHANNEL_SECRET）。</p>
+        )}
+      </section>
       {pulled && (
         <p className={`notice ${failed ? "error" : "success"}`}>
           カレンダーから取り込みました: 時間変更 {moved}件・削除 {deleted}件{failed ? `・取得できなかった予定 ${failed}件` : ""}

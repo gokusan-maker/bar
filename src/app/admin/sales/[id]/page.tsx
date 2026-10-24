@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { repository } from "@/lib/container";
@@ -16,7 +16,7 @@ export default async function SalePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
-  await requireAdmin();
+  const owner = (await requireStaff()) === "owner";
   const { id } = await params;
   const { saved, error } = await searchParams;
   const repo = repository();
@@ -29,7 +29,7 @@ export default async function SalePage({
     repo.listAudit({ targetId: id, limit: 50 }),
   ]);
   const member = staff.find((s) => s.id === sale.staffId);
-  const back = member && isBackTarget(sale, settings) ? backForSale(sale, member.backRates) : null;
+  const back = owner && member && isBackTarget(sale, settings) ? backForSale(sale, member.backRates) : null;
 
   return (
     <>
@@ -37,7 +37,9 @@ export default async function SalePage({
       {error && <p className="notice error">{error}</p>}
       <div className="row spread">
         <h1 style={{ margin: 0 }}>売上 {yen(saleTotal(sale))}</h1>
-        <Link href={`/admin/sales?month=${sale.businessDate.slice(0, 7)}`}>← {sale.businessDate.slice(0, 7)}の売上</Link>
+        <Link href={`/admin/sales?month=${sale.businessDate.slice(0, 7)}`}>
+          ← {sale.businessDate.slice(0, 7)}の売上
+        </Link>
       </div>
       <p className="muted">
         {sale.businessDate} ・ {sale.customerName ?? "お客様"} {sale.partySize}名
@@ -48,26 +50,31 @@ export default async function SalePage({
           </>
         )}
       </p>
-      <section className="card">
-        <strong>バック: </strong>
-        {back ? (
-          <>
-            {member!.name}さんに {yen(back.total)}
+      {owner && (
+        <section className="card">
+          <strong>バック: </strong>
+          {back ? (
+            <>
+              {member!.name}さんに {yen(back.total)}
+              <span className="muted">
+                {" "}
+                （売上全体 {yen(saleTotal(sale))} × {member!.backRates.rate}% ＝ {yen(back.byRate)}
+                {back.perVisit ? ` ＋ 固定 ${yen(back.perVisit)}` : ""}）
+              </span>
+            </>
+          ) : (
             <span className="muted">
-              {" "}
-              （お酒 {yen(back.drink)} ＋ 料金 {yen(back.charge)} ＋ サービス料 {yen(back.service)} ＋ 固定 {yen(back.perVisit)}）
+              {!member ? "担当スタッフなし" : "SNS経由ではないため対象外（設定で変更できます）"}
             </span>
-          </>
-        ) : (
-          <span className="muted">
-            {!member ? "担当スタッフなし" : "SNS経由ではないため対象外（設定で変更できます）"}
-          </span>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
       <section className="card">
         <h2 style={{ marginTop: 0 }}>証拠（{attachments.length}件）</h2>
-        {attachments.length === 0 && <p className="muted">伝票やレシートの写真を添付しておくと、後から確認できます。</p>}
+        {attachments.length === 0 && (
+          <p className="muted">伝票やレシートの写真を添付しておくと、後から確認できます。</p>
+        )}
         <div className="thumbs">
           {attachments.map((a) => (
             <figure key={a.id} className="thumb">
@@ -113,16 +120,18 @@ export default async function SalePage({
         <HistoryList logs={logs} links={false} />
       </section>
 
-      <form action={deleteSaleAction} style={{ marginTop: 24 }}>
-        <input type="hidden" name="id" value={sale.id} />
-        <label>
-          <input type="checkbox" name="confirm" required />
-          削除すると元に戻せないことを確認しました
-        </label>
-        <button type="submit" className="danger">
-          この売上を削除（添付も削除されます）
-        </button>
-      </form>
+      {owner && (
+        <form action={deleteSaleAction} style={{ marginTop: 24 }}>
+          <input type="hidden" name="id" value={sale.id} />
+          <label>
+            <input type="checkbox" name="confirm" required />
+            削除すると元に戻せないことを確認しました
+          </label>
+          <button type="submit" className="danger">
+            この売上を削除（添付も削除されます）
+          </button>
+        </form>
+      )}
     </>
   );
 }
