@@ -3,7 +3,7 @@ import { summarizeCustomers } from "./customers";
 import type { Customer, Reservation, Sale } from "./types";
 
 const customer = (id: string): Customer => ({
-  id, channel: "line", externalId: id, displayName: id, name: null, note: null, staffId: null, phone: null, birthday: null, tags: [], createdAt: "",
+  id, channel: "line", externalId: id, displayName: id, name: null, note: null, staffId: null, phone: null, birthday: null, tags: [], birthdayGreetedYear: null, createdAt: "",
 });
 const res = (customerId: string, status: Reservation["status"], startAt: string): Reservation => ({
   id: `${customerId}-${startAt}`, customerId, startAt, endAt: startAt, partySize: 2, name: "x", notes: null,

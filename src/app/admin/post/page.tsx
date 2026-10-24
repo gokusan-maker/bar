@@ -4,7 +4,7 @@ import { appBaseUrl, instagramClient, lineClient, repository, reservationService
 import { availabilityPost, seatMark } from "@/lib/domain/post";
 import { addDays, isValidDate, toJst, weekdayJa } from "@/lib/domain/time";
 import { CopyButton } from "../copy-button";
-import { savePromoSettingsAction, sendPromoNowAction, uploadPromoImageAction } from "../promo-actions";
+import { saveBirthdaySettingsAction, savePromoSettingsAction, sendPromoNowAction, uploadPromoImageAction } from "../promo-actions";
 import { PromoImageInput } from "./promo-image-input";
 
 /** LINEの今月の送信通数（取得できなければ null） */
@@ -130,6 +130,24 @@ export default async function PostPage({
           <button type="submit" disabled={!lineReady && !(settings.promoInstagram && instagramReady)}>
             今すぐ配信
           </button>
+        </form>
+      </section>
+
+      <section className="card">
+        <h2 style={{ marginTop: 0 }}>誕生日のお祝い（LINE）</h2>
+        <p className="muted">
+          お客様リストに誕生日が入っているLINEのお客様へ、誕生日の当日12時にお祝いを送ります（1人1通、送信通数にカウントされます）。誕生日はお客様の画面で入力できます。
+        </p>
+        <form action={saveBirthdaySettingsAction}>
+          <label>
+            <input type="checkbox" name="birthdayGreetingEnabled" defaultChecked={settings.birthdayGreetingEnabled} />
+            誕生日にお祝いを送る
+          </label>
+          <label>
+            お祝いの文（{"{name}"} がお名前になります）
+            <textarea name="birthdayMessage" rows={4} maxLength={500} defaultValue={settings.birthdayMessage} />
+          </label>
+          <button type="submit">保存</button>
         </form>
       </section>
 

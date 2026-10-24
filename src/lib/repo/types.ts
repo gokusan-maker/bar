@@ -64,7 +64,9 @@ export interface ReservationQuery {
 export type NewStaff = Omit<Staff, "id" | "createdAt" | "passwordHash" | "pending"> &
   Partial<Pick<Staff, "passwordHash" | "pending">>;
 
-export type CustomerPatch = Partial<Pick<Customer, "name" | "note" | "displayName" | "staffId" | "phone" | "birthday" | "tags">>;
+export type CustomerPatch = Partial<
+  Pick<Customer, "name" | "note" | "displayName" | "staffId" | "phone" | "birthday" | "tags" | "birthdayGreetedYear">
+>;
 
 export interface OrderQuery {
   /** この時刻以降に作られた注文 */

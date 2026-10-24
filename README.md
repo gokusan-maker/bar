@@ -36,6 +36,7 @@ SNS（LINE・Instagram）のメッセージで届いた予約を自動で読み�
 | 予約フォーム | `/reserve` の公開ページ。InstagramのプロフィールやLINEのリッチメニューに載せると、DMを送らないお客様も予約できる（設定でオン）。電話番号で同じお客様をまとめ、SNS経由として集計。ボット対策の隠し欄と送信回数の制限つき |
 | セットアップ診断 | 設定画面の「セットアップ診断」で、Supabase（未実行のSQLも検出）・Claude API・LINE・Instagram・Googleカレンダー・自動処理の設定を確認 |
 | 集客の自動配信 | その日の空き状況を、決めた時刻（12時か17時）・曜日にLINEの友だち全員へ自動配信。空いている時間のボタン付きで、タップするとそのまま自動受付で予約が完了する。空きがない日は送らない。LINEの月の送信上限を超えそうなら送らずに店主へ通知。Instagramのフィードへの自動投稿（画像を1枚登録）も選べる |
+| 誕生日のお祝い | お客様リストに誕生日が入っているLINEのお客様へ、誕生日の当日12時にお祝いを自動で送る（文面は自由に変更、{name} がお名前に。同じ年は1回だけ。2/29生まれはうるう年以外2/28） |
 | 空き状況の投稿 | 予約状況から「本日の空き状況」の文面を自動で作り、コピーしてInstagramのストーリーズに貼れる。Xは「Xで投稿する」ボタンで文面入りの投稿画面を開ける（X APIは有料のため自動投稿はしない） |
 | QRコード・URLでお酒の注文 | 店主がメニューと席を登録すると、席ごとのQRコード（印刷用ページあり）とURLができる。お客様はスマホで読み取ってメニューから注文。注文は「注文」画面（スタッフも使える・15秒ごとに自動更新）に届き、提供済み・取消を記録。会計で席の注文を売上（お酒の金額）に取り込める |
 | お客様一覧 | 名前で検索、最終来店・来店回数・利用金額で並べ替え。担当スタッフ、今後の予約、無断キャンセル回数も表示 |
@@ -60,7 +61,7 @@ http://localhost:3000/admin/simulator を開き、「土曜の9時から2名で�
 
 ### 1. Supabase（データベース）
 1. https://supabase.com でプロジェクトを作成
-2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders → customer_profile）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
+2. SQL Editor で `supabase/migrations/` のSQLを**ファイル名の古い順にすべて**実行（init → sales → audit → privacy → web_booking → x_channel → grants → staff_login → orders → customer_profile → birthday_greeting）。表はすべて `bar` スキーマに作られるので、ほかのアプリと同じプロジェクトに同居できます。証拠写真用の非公開バケット `bar-evidence` もここで作られます
 3. Project Settings → Data API → **Exposed schemas に `bar` を追加**して保存（しないとアプリから表が見えません）
 4. Project Settings → API の URL と `service_role` キーを `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` に設定
 5. `TOKEN_ENCRYPTION_KEY` に長いランダム文字列を設定（例: `openssl rand -base64 32`）

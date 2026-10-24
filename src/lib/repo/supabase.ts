@@ -55,6 +55,7 @@ const toCustomer = (r: any): Customer => ({
   phone: r.phone ?? null,
   birthday: r.birthday ?? null,
   tags: r.tags ?? [],
+  birthdayGreetedYear: r.birthday_greeted_year ?? null,
   createdAt: r.created_at,
 });
 
@@ -325,6 +326,7 @@ export class SupabaseRepository implements Repository {
     if (patch.phone !== undefined) row.phone = patch.phone;
     if (patch.birthday !== undefined) row.birthday = patch.birthday;
     if (patch.tags !== undefined) row.tags = patch.tags;
+    if (patch.birthdayGreetedYear !== undefined) row.birthday_greeted_year = patch.birthdayGreetedYear;
     check(await this.db.from("customers").update(row).eq("id", id));
   }
 

@@ -50,6 +50,8 @@ export interface Customer {
   birthday: string | null;
   /** 自由なタグ（常連、VIP、ワイン好き など） */
   tags: string[];
+  /** 誕生日のメッセージを最後に送った年（同じ年に二重に送らないため） */
+  birthdayGreetedYear: number | null;
   createdAt: string;
 }
 
@@ -174,6 +176,10 @@ export interface ShopSettings {
   promoImageKey: string;
   /** 最後に配信した営業日（同じ日に二重に送らないため） */
   promoLastSentDate: string;
+  /** 誕生日の当日にLINEでお祝いを送る */
+  birthdayGreetingEnabled: boolean;
+  /** お祝いの文。{name} がお名前に置き換わる */
+  birthdayMessage: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -216,6 +222,8 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   promoInstagram: false,
   promoImageKey: "",
   promoLastSentDate: "",
+  birthdayGreetingEnabled: false,
+  birthdayMessage: "{name}様、お誕生日おめでとうございます🎂\n素敵な1年になりますように。今月ご来店の際は、お祝いに1杯サービスいたします🥂",
 };
 
 /** 売上全体（お酒＋料金＋サービス料）に対するバック率（%）と、1組あたりの固定バック（円） */

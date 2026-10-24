@@ -54,6 +54,15 @@ export default async function OrderPage({
         {table.name}　ご注文
       </p>
       {done && <p className="notice success">ご注文を受け付けました。お席までお持ちします。</p>}
+      {done && settings.lineFriendUrl && (
+        <p className="card" style={{ textAlign: "center" }}>
+          LINEの友だち追加で、空き状況やお得な情報をお届けします
+          <br />
+          <a className="button line-button" href={settings.lineFriendUrl} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8 }}>
+            LINEで友だち追加
+          </a>
+        </p>
+      )}
       {error && <p className="notice error">{error}</p>}
       {!settings.orderingEnabled ? (
         <p className="notice">ただいまこちらからのご注文は受け付けていません。スタッフにお声がけください。</p>

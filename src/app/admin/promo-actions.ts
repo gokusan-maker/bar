@@ -37,6 +37,17 @@ export async function savePromoSettingsAction(formData: FormData) {
   go({ saved: "1" });
 }
 
+export async function saveBirthdaySettingsAction(formData: FormData) {
+  await requireAdmin();
+  const repo = repository();
+  const current = await repo.getSettings();
+  const enabled = formData.get("birthdayGreetingEnabled") === "on";
+  const message = str(formData, "birthdayMessage").slice(0, 500);
+  if (enabled && !message) go({ error: "お祝いの文を入力してください" });
+  await repo.saveSettings({ ...current, birthdayGreetingEnabled: enabled, birthdayMessage: message });
+  go({ saved: "1" });
+}
+
 /** Instagram投稿用の画像（InstagramのAPIはJPEGのみ） */
 export async function uploadPromoImageAction(formData: FormData) {
   await requireAdmin();

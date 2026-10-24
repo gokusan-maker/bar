@@ -914,6 +914,35 @@ export class ReservationService {
     }
     return sent;
   }
+
+  /** 誕生日の当日（12時の定期処理）に、LINEのお客様へお祝いを送る。同じ年には一度だけ */
+  async sendBirthdayGreetings(): Promise<number> {
+    const settings = await this.repo.getSettings();
+    if (!settings.birthdayGreetingEnabled || !settings.birthdayMessage.trim()) return 0;
+    const today = toJst(this.now()).date;
+    const year = Number(today.slice(0, 4));
+    const mmdd = today.slice(5);
+    // うるう年でない年は、2/29生まれの方に2/28に送る
+    const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    const matches = (b: string | null) => b === mmdd || (b === "02-29" && mmdd === "02-28" && !isLeap(year));
+    const targets = (await this.repo.listCustomers({ limit: 10000 })).filter(
+      (c) => c.channel === "line" && c.externalId && matches(c.birthday) && c.birthdayGreetedYear !== year,
+    );
+    let sent = 0;
+    for (const c of targets) {
+      const text = settings.birthdayMessage.replaceAll("{name}", c.name ?? c.displayName ?? "お客");
+      try {
+        await this.messenger.push(c, text);
+        await this.repo.addMessage({ customerId: c.id, direction: "out", text, extraction: null });
+        await this.repo.updateCustomer(c.id, { birthdayGreetedYear: year });
+        sent++;
+      } catch (error) {
+        console.error("birthday greeting failed", error);
+      }
+    }
+    if (sent) await this.notifier.notify(`🎂 本日お誕生日のお客様${sent}名にLINEでお祝いを送りました`);
+    return sent;
+  }
 }
 
 function customerLabel(c: Customer): string {

@@ -94,6 +94,7 @@ export class MemoryRepository implements Repository {
       phone: null,
       birthday: null,
       tags: [],
+      birthdayGreetedYear: null,
       createdAt: this.stamp(),
     };
     this.customers.set(customer.id, customer);
@@ -119,7 +120,15 @@ export class MemoryRepository implements Repository {
       .map((c) => ({ ...c, tags: [...c.tags] }));
   }
   async createCustomer(input: Pick<Customer, "channel" | "name" | "phone" | "birthday" | "tags" | "note" | "staffId">) {
-    const customer: Customer = { ...input, tags: [...input.tags], id: randomUUID(), externalId: null, displayName: null, createdAt: this.stamp() };
+    const customer: Customer = {
+      ...input,
+      tags: [...input.tags],
+      id: randomUUID(),
+      externalId: null,
+      displayName: null,
+      birthdayGreetedYear: null,
+      createdAt: this.stamp(),
+    };
     this.customers.set(customer.id, customer);
     return { ...customer, tags: [...customer.tags] };
   }

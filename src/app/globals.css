@@ -434,7 +434,7 @@ button.chip {
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   margin: 12px 0;
 }
@@ -444,7 +444,9 @@ button.chip {
   flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 8px 6px;
+  min-width: 0;
+  font-size: 0.9rem;
   text-decoration: none;
   color: var(--text);
 }
@@ -637,3 +639,6 @@ button.chip {
 .qr-shop { font-weight: 600; }
 .qr-table { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
 @media print { .qr-grid { grid-template-columns: 1fr 1fr; } }
+
+/* 今夜のまとめ：スマホでも5つが1行に収まるように、見出しは折り返さない */
+.tile .muted { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
