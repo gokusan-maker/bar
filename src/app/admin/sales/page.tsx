@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import Link from "next/link";
 import { repository, salesService } from "@/lib/container";
 import { isSnsChannel, monthRange, saleTotal, shiftMonth, yen } from "@/lib/domain/sales";
@@ -13,7 +13,8 @@ export default async function SalesPage({
 }: {
   searchParams: Promise<{ month?: string; deleted?: string }>;
 }) {
-  await requireAdmin();
+  // スタッフは売上の入力と一覧まで。バックの金額は店主だけが見る
+  const owner = (await requireStaff()) === "owner";
   const params = await searchParams;
   const thisMonth = toJst(new Date()).date.slice(0, 7);
   const month = params.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : thisMonth;
@@ -24,7 +25,10 @@ export default async function SalesPage({
     repo.listSales({ fromDate: first, toDate: last }),
     repo.listStaff(),
     repo.getSettings(),
-    repo.listReservations({ from: fromJst(first, "06:00"), to: fromJst(last, "30:00") }),
+    repo.listReservations({
+      from: fromJst(first, "06:00"),
+      to: fromJst(last, "30:00"),
+    }),
   ]);
   // 営業日がその月のものだけ（深夜帯は前日扱い）
   const monthReservations = reservations.filter((r) => businessDateOf(r, settings).startsWith(month));
@@ -40,7 +44,7 @@ export default async function SalesPage({
       {params.deleted && <p className="notice success">削除しました</p>}
       <div className="row spread" style={{ marginBottom: 12 }}>
         <h1 style={{ margin: 0 }}>
-          {y}年{m}月の売上・バック
+          {y}年{m}月の売上{owner ? "・バック" : ""}
         </h1>
         <div className="row">
           <Link className="button" href={`/admin/sales?month=${shiftMonth(month, -1)}`}>
@@ -67,59 +71,69 @@ export default async function SalesPage({
             {report.sns.count}組 {report.sns.guests}名
           </div>
         </div>
-        <div className="stat">
-          <div className="muted">バック合計</div>
-          <div className="value">{yen(report.backTotal)}</div>
-          <div className="muted">{settings.backTarget === "sns" ? "SNS経由の売上が対象" : "全売上が対象"}</div>
-        </div>
-      </div>
-
-      <section className="card">
-        <div className="row spread">
-          <h2 style={{ margin: 0 }}>スタッフ別バック</h2>
-          <a className="button" href={`/api/reports/monthly?month=${month}`}>
-            CSVダウンロード
-          </a>
-        </div>
-        {report.staff.length === 0 ? (
-          <p className="muted">
-            スタッフが登録されていません。<Link href="/admin/staff">スタッフを登録</Link>
-          </p>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>スタッフ</th>
-                  <th>組数</th>
-                  <th>対象売上</th>
-                  <th>お酒</th>
-                  <th>料金</th>
-                  <th>サービス料</th>
-                  <th>固定</th>
-                  <th>バック合計</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.staff.map((r) => (
-                  <tr key={r.staff.id}>
-                    <td>{r.staff.name}</td>
-                    <td>{r.sales.count}</td>
-                    <td>{yen(r.sales.total)}</td>
-                    <td>{yen(r.back.drink)}</td>
-                    <td>{yen(r.back.charge)}</td>
-                    <td>{yen(r.back.service)}</td>
-                    <td>{yen(r.back.perVisit)}</td>
-                    <td>
-                      <strong>{yen(r.back.total)}</strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {owner && (
+          <div className="stat">
+            <div className="muted">バック合計</div>
+            <div className="value">{yen(report.backTotal)}</div>
+            <div className="muted">{settings.backTarget === "sns" ? "SNS経由の売上が対象" : "全売上が対象"}</div>
           </div>
         )}
-      </section>
+      </div>
+
+      {owner && (
+        <>
+          <section className="card">
+            <div className="row spread">
+              <h2 style={{ margin: 0 }}>スタッフ別バック</h2>
+              <div className="row">
+                <a className="button" href={`/api/reports/monthly?month=${month}`}>
+                  CSV
+                </a>
+                <Link className="button" href={`/print/back?month=${month}`}>
+                  PDF
+                </Link>
+              </div>
+            </div>
+            {report.staff.length === 0 ? (
+              <p className="muted">
+                スタッフが登録されていません。
+                <Link href="/admin/staff">スタッフを登録</Link>
+              </p>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>スタッフ</th>
+                      <th>組数</th>
+                      <th>対象売上</th>
+                      <th>バック率</th>
+                      <th>率によるバック</th>
+                      <th>固定</th>
+                      <th>バック合計</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.staff.map((r) => (
+                      <tr key={r.staff.id}>
+                        <td>{r.staff.name}</td>
+                        <td>{r.sales.count}</td>
+                        <td>{yen(r.sales.total)}</td>
+                        <td>{r.staff.backRates.rate}%</td>
+                        <td>{yen(r.back.byRate)}</td>
+                        <td>{yen(r.back.perVisit)}</td>
+                        <td>
+                          <strong>{yen(r.back.total)}</strong>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       <section className="card">
         <h2 style={{ marginTop: 0 }}>経路別・項目別</h2>

@@ -4,6 +4,7 @@ import { repository, reservationService } from "@/lib/container";
 import { Tonight } from "./tonight";
 import { addDays, DAY_MS, formatJa, fromJst, isValidDate, toJst, weekdayOf, weekdayJa } from "@/lib/domain/time";
 import type { Reservation } from "@/lib/domain/types";
+import { businessDayStart } from "@/lib/order-service";
 import { businessClockOf, businessDateOf } from "@/lib/reservation-service";
 import { CHANNEL_LABEL, ReservationActions, StatusBadge } from "./ui";
 
@@ -28,14 +29,16 @@ export default async function AdminHome({
   const repo = repository();
   const settings = await repo.getSettings();
 
-  const [pending, inRange, board] = await Promise.all([
+  const [pending, inRange, board, orders] = await Promise.all([
     repo.listReservations({ from: now, statuses: ["pending"] }),
     repo.listReservations({
       from: fromJst(from, "06:00"),
       to: new Date(fromJst(from, "06:00").getTime() + DAYS * DAY_MS),
     }),
     reservationService().availabilityBoard(today),
+    repo.listOrders({ since: businessDayStart(now), limit: 500 }),
   ]);
+  const liveOrders = orders.filter((o) => o.status !== "cancelled");
 
   const byDate = new Map<string, Reservation[]>();
   for (let i = 0; i < DAYS; i++) byDate.set(addDays(from, i), []);
@@ -53,6 +56,10 @@ export default async function AdminHome({
           board={board}
           pendingCount={pending.length}
           owner={owner}
+          orders={{
+            waiting: liveOrders.filter((o) => o.status === "new").length,
+            total: liveOrders.reduce((n, o) => n + o.total, 0),
+          }}
         />
       )}
 

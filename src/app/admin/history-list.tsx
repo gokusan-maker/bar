@@ -14,6 +14,7 @@ function targetHref(a: AuditLog): string | null {
   if (a.targetType === "reservation") return `/admin/reservations/${a.targetId}`;
   if (a.targetType === "sale") return `/admin/sales/${a.targetId}`;
   if (a.targetType === "staff") return "/admin/staff";
+  if (a.targetType === "order") return "/admin/orders";
   return null;
 }
 

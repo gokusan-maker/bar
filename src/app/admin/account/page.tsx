@@ -1,0 +1,67 @@
+import { redirect } from "next/navigation";
+import { currentSession } from "@/lib/auth";
+import { lineLoginConfig, repository } from "@/lib/container";
+import { MIN_PASSWORD_LENGTH } from "@/lib/staff-accounts";
+import { LineLoginButton } from "../../login/line-button";
+import { changeOwnLoginIdAction, changeOwnPasswordAction } from "./actions";
+
+/** スタッフ本人のアカウント（LINEの連携・パスワード） */
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ linked?: string; saved?: string; error?: string }> }) {
+  const session = await currentSession();
+  if (!session) redirect("/login");
+  // 店舗1の旧オーナー（ADMIN_PASSWORD）は自分のアカウントがないので設定画面へ
+  if (session.role === "owner" && !session.memberId) redirect("/admin/settings");
+  const { linked, saved, error } = await searchParams;
+  const me = session.memberId ? await repository().getStaff(session.memberId) : null;
+
+  return (
+    <>
+      <h1>アカウント</h1>
+      {linked && <p className="notice success">LINEを連携しました。次からは「LINEでログイン」でログインできます。</p>}
+      {saved && <p className="notice success">{saved === "id" ? "ログインIDを保存しました" : "パスワードを保存しました"}</p>}
+      {error && <p className="notice error">{error}</p>}
+      {!me ? (
+        <p className="notice">共通のスタッフ用パスワードでログインしています。自分のアカウントを作るには、店主から登録用リンクをもらってください。</p>
+      ) : (
+        <>
+          <section className="card">
+            <h2 style={{ marginTop: 0 }}>{me.name}</h2>
+            <p>LINEでログイン：{me.lineUserId ? "連携済み" : "未連携"}</p>
+            {!me.lineUserId &&
+              (lineLoginConfig() ? (
+                <LineLoginButton purpose={me.role === "owner" ? "link-owner" : "link-staff"} label="LINEと連携する" />
+              ) : (
+                <p className="muted">LINEログインが設定されていません（店主にお問い合わせください）。</p>
+              ))}
+          </section>
+          <form action={changeOwnLoginIdAction} className="card">
+            <h2 style={{ marginTop: 0 }}>ログインID</h2>
+            <label>
+              IDとパスワードでログインするときのID（半角英数字3〜30文字）
+              <input name="loginId" required defaultValue={me.loginId ?? ""} autoCapitalize="none" spellCheck={false} maxLength={30} />
+            </label>
+            <button type="submit">保存</button>
+          </form>
+          <form action={changeOwnPasswordAction} className="card">
+            <h2 style={{ marginTop: 0 }}>{me.passwordHash ? "パスワードを変える" : "パスワードを決める（LINEが使えないとき用）"}</h2>
+            {me.passwordHash && (
+              <label>
+                今のパスワード
+                <input type="password" name="currentPassword" required autoComplete="current-password" />
+              </label>
+            )}
+            <label>
+              新しいパスワード（{MIN_PASSWORD_LENGTH}文字以上）
+              <input type="password" name="newPassword" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
+            </label>
+            <label>
+              新しいパスワード（確認）
+              <input type="password" name="newPassword2" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
+            </label>
+            <button type="submit">保存</button>
+          </form>
+        </>
+      )}
+    </>
+  );
+}

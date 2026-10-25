@@ -1,6 +1,10 @@
 import "server-only";
 import { headers } from "next/headers";
-import { repository } from "./container";
+import { shopRepository } from "./container";
+import { DEFAULT_SHOP_ID } from "./domain/types";
+
+// ログイン失敗の記録は店舗に関係なく1か所（店舗1の保存先）にまとめる
+const failures = () => shopRepository(DEFAULT_SHOP_ID);
 
 const WINDOW_MS = 15 * 60 * 1000;
 /** 同じIPからの失敗回数の上限（15分あたり） */
@@ -16,7 +20,7 @@ export async function clientIp(): Promise<string> {
 /** ロック中ならtrue */
 export async function isLockedOut(ip: string): Promise<boolean> {
   const since = new Date(Date.now() - WINDOW_MS);
-  const repo = repository();
+  const repo = failures();
   const [byIp, total] = await Promise.all([
     repo.countLoginFailures(since, ip),
     repo.countLoginFailures(since),
@@ -25,5 +29,5 @@ export async function isLockedOut(ip: string): Promise<boolean> {
 }
 
 export async function recordFailure(ip: string): Promise<void> {
-  await repository().recordLoginFailure(ip);
+  await failures().recordLoginFailure(ip);
 }

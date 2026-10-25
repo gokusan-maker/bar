@@ -1,13 +1,15 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { repository } from "@/lib/container";
-import { summarizeCustomers } from "@/lib/domain/customers";
+import { birthdayLabel, phoneLabel, summarizeCustomers } from "@/lib/domain/customers";
 import { yen } from "@/lib/domain/sales";
 import { formatJa } from "@/lib/domain/time";
 import { canMessage } from "@/lib/domain/types";
 import { businessDateOf } from "@/lib/reservation-service";
-import { manualReplyAction, saveCustomerNoteAction } from "../../actions";
+import { manualReplyAction } from "../../actions";
+import { saveCustomerProfileAction } from "../../customer-actions";
+import { ProfileFields } from "../profile-fields";
 import { setCustomerStaffAction } from "../../sales-actions";
 import { CHANNEL_LABEL, StatusBadge } from "../../ui";
 
@@ -18,7 +20,7 @@ export default async function CustomerPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string; saved?: string }>;
 }) {
-  await requireAdmin();
+  const owner = (await requireStaff()) === "owner";
   const { id } = await params;
   const { error, saved } = await searchParams;
   const repo = repository();
@@ -43,8 +45,29 @@ export default async function CustomerPage({
       <p className="muted">
         来店 {summary.visits}回 ・ 最終来店 {summary.lastVisit ?? "—"} ・ 利用金額 {yen(summary.totalSpend)}
         {summary.noShows > 0 && ` ・ 無断キャンセル ${summary.noShows}回`}
-        {customer.externalId && <><br />ユーザーID: {customer.externalId}</>}
+        {customer.phone && (
+          <>
+            <br />
+            電話: <a href={`tel:${customer.phone}`}>{phoneLabel(customer.phone)}</a>
+          </>
+        )}
+        {customer.birthday && <> ・ 誕生日 {birthdayLabel(customer.birthday)}</>}
+        {customer.externalId && customer.channel !== "web" && customer.channel !== "x" && (
+          <>
+            <br />
+            ユーザーID: {customer.externalId}
+          </>
+        )}
       </p>
+      {customer.tags.length > 0 && (
+        <p className="row">
+          {customer.tags.map((t) => (
+            <Link key={t} className="badge" href={`/admin/customers?tag=${encodeURIComponent(t)}`}>
+              {t}
+            </Link>
+          ))}
+        </p>
+      )}
       {error && <p className="notice error">{error}</p>}
       {saved && <p className="notice success">保存しました</p>}
 
@@ -60,33 +83,35 @@ export default async function CustomerPage({
             </li>
           ))}
         </ul>
-        <form action={setCustomerStaffAction} style={{ marginTop: 12 }} className="row">
-          <input type="hidden" name="customerId" value={customer.id} />
-          <label style={{ marginBottom: 0, flex: 1 }}>
-            担当スタッフ（バック先）
-            <select name="staffId" defaultValue={customer.staffId ?? ""}>
-              <option value="">なし</option>
-              {staff
-                .filter((s) => s.active || s.id === customer.staffId)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <button type="submit" style={{ alignSelf: "flex-end" }}>
-            担当を保存
-          </button>
-        </form>
-        <form action={saveCustomerNoteAction} style={{ marginTop: 12 }}>
-          <input type="hidden" name="customerId" value={customer.id} />
-          <label>
-            顧客メモ（好きなお酒、NG事項など）
-            <textarea name="note" rows={2} defaultValue={customer.note ?? ""} />
-          </label>
-          <button type="submit">メモを保存</button>
-        </form>
+        {owner && (
+          <form action={setCustomerStaffAction} style={{ marginTop: 12 }} className="row">
+            <input type="hidden" name="customerId" value={customer.id} />
+            <label style={{ marginBottom: 0, flex: 1 }}>
+              担当スタッフ（バック先）
+              <select name="staffId" defaultValue={customer.staffId ?? ""}>
+                <option value="">なし</option>
+                {staff
+                  .filter((s) => s.active || s.id === customer.staffId)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button type="submit" style={{ alignSelf: "flex-end" }}>
+              担当を保存
+            </button>
+          </form>
+        )}
+        <details style={{ marginTop: 12 }} open={!customer.name}>
+          <summary>お客様の情報を編集（名前・電話・誕生日・タグ・メモ）</summary>
+          <form action={saveCustomerProfileAction}>
+            <input type="hidden" name="customerId" value={customer.id} />
+            <ProfileFields customer={customer} />
+            <button type="submit">保存</button>
+          </form>
+        </details>
       </section>
 
       <section className="card">

@@ -434,7 +434,7 @@ button.chip {
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   margin: 12px 0;
 }
@@ -444,7 +444,9 @@ button.chip {
   flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 8px 6px;
+  min-width: 0;
+  font-size: 0.9rem;
   text-decoration: none;
   color: var(--text);
 }
@@ -569,3 +571,82 @@ button.chip {
   font-weight: 600;
   margin-bottom: 16px;
 }
+
+/* 印刷・PDF用（スタッフ別バック明細）。画面の色設定に関係なく白地に黒で出す */
+.print-sheet {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  background: #fff;
+  color: #111;
+  min-height: 100vh;
+}
+.print-sheet h1 { font-size: 1.4rem; margin-bottom: 4px; }
+.print-sheet h2 { font-size: 1.05rem; margin: 24px 0 8px; }
+.print-sheet .muted { color: #555; }
+.print-sheet table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.print-sheet th,
+.print-sheet td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; color: #111; background: #fff; }
+.print-sheet th { background: #f0f0f0; }
+.print-sheet td:nth-child(n + 2) { white-space: nowrap; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .print-sheet { padding: 0; max-width: none; min-height: 0; }
+  .print-staff { break-inside: avoid; }
+  .print-sheet tr { break-inside: avoid; }
+}
+
+/* QRコード注文（お客様の画面） */
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.order-item:first-of-type { border-top: 0; }
+.qty { display: flex; align-items: center; gap: 10px; }
+.qty button { width: 44px; height: 44px; padding: 0; font-size: 1.3rem; border-radius: 50%; }
+.qty span { min-width: 1.5em; text-align: center; font-weight: 600; }
+.order-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 0.08);
+}
+.order-bar .primary { min-width: 140px; }
+
+/* 注文（店側の画面） */
+.order-ticket { padding: 10px 0; border-top: 1px solid var(--border); }
+.order-ticket:first-of-type { border-top: 0; }
+.order-ticket ul { margin: 6px 0; padding-left: 18px; font-size: 1.05rem; }
+
+/* 注文用QRコードの印刷（A4に2列） */
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.qr-card { border: 1px dashed #999; border-radius: 8px; padding: 16px; text-align: center; break-inside: avoid; }
+.qr-card svg { display: block; margin: 8px auto; }
+.qr-shop { font-weight: 600; }
+.qr-table { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
+@media print { .qr-grid { grid-template-columns: 1fr 1fr; } }
+
+/* 今夜のまとめ：スマホでも5つが1行に収まるように、見出しは折り返さない */
+.tile .muted { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 製品の紹介ページ */
+.landing .hero { text-align: center; padding: 32px 0 24px; }
+.landing .hero h1 { font-size: clamp(1.6rem, 6vw, 2.4rem); margin: 8px 0 12px; }
+.landing .hero p { max-width: 640px; margin-left: auto; margin-right: auto; }
+.landing .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 24px 0; }
+.landing .features .card { margin: 0; }
+.landing .features h2 { font-size: 1.05rem; margin: 4px 0 8px; }
