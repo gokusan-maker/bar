@@ -89,6 +89,35 @@ export class LineClient {
     });
   }
 
+  /** 友だち全員に一斉送信（友だちの人数分、送信通数にカウントされる） */
+  async broadcast(texts: string[], quickReplies: { label: string; text: string }[] = []) {
+    if (!texts.length) return;
+    await this.call("/message/broadcast", {
+      method: "POST",
+      body: JSON.stringify({ messages: lineMessages(texts, quickReplies) }),
+    });
+  }
+
+  /** 今月の送信通数。limit が null なら上限なし（追加メッセージを購入できるプラン） */
+  async quota(): Promise<{ limit: number | null; used: number }> {
+    const [quota, usage] = await Promise.all([
+      this.call("/message/quota", { method: "GET" }).then((r) => r.json() as Promise<{ type: string; value?: number }>),
+      this.call("/message/quota/consumption", { method: "GET" }).then((r) => r.json() as Promise<{ totalUsage: number }>),
+    ]);
+    return { limit: quota.type === "limited" ? (quota.value ?? 0) : null, used: usage.totalUsage };
+  }
+
+  /** 一斉送信が届く人数の目安（前日の集計。集計前や取得できなければ null） */
+  async reachEstimate(yyyymmdd: string): Promise<number | null> {
+    try {
+      const res = await this.call(`/insight/followers?date=${yyyymmdd}`, { method: "GET" });
+      const body = (await res.json()) as { status?: string; targetedReaches?: number };
+      return body.status === "ready" && typeof body.targetedReaches === "number" ? body.targetedReaches : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** 接続確認用: 公式アカウントの名前 */
   async botName(): Promise<string> {
     const res = await this.call("/info", { method: "GET" });
