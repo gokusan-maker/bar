@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Ad } from "@/app/ad";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { directory, repository, reservationService } from "@/lib/container";
@@ -187,6 +188,7 @@ async function renderReserve(slug: string, params: { s?: string; at?: string; n?
           </form>
         </>
       )}
+      <Ad place="public" />
     </main>
   );
 }

@@ -650,3 +650,8 @@ button.chip {
 .landing .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 24px 0; }
 .landing .features .card { margin: 0; }
 .landing .features h2 { font-size: 1.05rem; margin: 4px 0 8px; }
+
+/* 広告枠 */
+.ad-slot { margin: 16px 0; text-align: center; min-height: 60px; }
+.ad-slot .ad-label { display: block; font-size: 0.7rem; color: var(--muted); text-align: left; }
+@media print { .ad-slot { display: none; } }

@@ -3,6 +3,7 @@ import { authMode, currentSession, requireStaff } from "@/lib/auth";
 import { googleOAuthConfig, isMemoryMode, repository } from "@/lib/container";
 import { logoutAction } from "./actions";
 import { TabBar } from "./tabbar";
+import { Ad } from "@/app/ad";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </details>
         )}
         {children}
+        <Ad place="admin" />
       </main>
       <TabBar owner={owner} />
     </>

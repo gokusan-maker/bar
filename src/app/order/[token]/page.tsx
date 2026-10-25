@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Ad } from "@/app/ad";
 import { redirect } from "next/navigation";
 import { directory, repository } from "@/lib/container";
 import { withShop } from "@/lib/shop-context";
@@ -102,6 +103,7 @@ async function renderOrder(shopId: string, token: string, done: string | undefin
           </p>
         </section>
       )}
+      <Ad place="public" />
     </main>
   );
 }

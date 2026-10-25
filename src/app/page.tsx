@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { currentRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { Ad } from "@/app/ad";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function Home() {
   return (
     <main className="container landing" style={{ maxWidth: 880, paddingTop: 32, paddingBottom: 48 }}>
       <section className="hero">
-        <p className="muted" style={{ margin: 0 }}>バー・スナック・ラウンジのための</p>
+        <p className="muted" style={{ margin: 0 }}>バー・スナック・ラウンジのための　無料で使えます</p>
         <h1>予約も集客も、LINEで自動に。</h1>
         <p>
           SNSからの予約受付、空き状況の配信、QRコードでの注文、売上とスタッフのバック計算まで。スマホひとつでお店の毎日が回ります。
@@ -42,7 +43,7 @@ export default async function Home() {
             スタッフのログイン
           </Link>
         </div>
-        {price && <p className="muted">料金：{price}</p>}
+        {price ? <p className="muted">料金：{price}</p> : <p className="muted">登録・利用は無料です（画面に広告が表示されます）</p>}
       </section>
 
       <section className="features">
@@ -56,10 +57,12 @@ export default async function Home() {
         ))}
       </section>
 
+      <Ad place="landing" />
+
       <section className="card" style={{ textAlign: "center" }}>
         <h2 style={{ marginTop: 0 }}>はじめかた</h2>
         <ol style={{ textAlign: "left", display: "inline-block", margin: 0 }}>
-          <li>「お店を登録する」から店名とログインIDを登録{process.env.SIGNUP_CODE ? "（お申し込み後にお知らせする登録コードが必要です）" : ""}</li>
+          <li>「お店を登録する」から店名とログインIDを登録（無料）</li>
           <li>設定画面でお店の席数・営業時間と、LINE公式アカウントをつなぐ</li>
           <li>スタッフに登録用リンクを送る（LINEでかんたん登録）</li>
         </ol>
