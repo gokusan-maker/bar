@@ -642,3 +642,11 @@ button.chip {
 
 /* 今夜のまとめ：スマホでも5つが1行に収まるように、見出しは折り返さない */
 .tile .muted { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 製品の紹介ページ */
+.landing .hero { text-align: center; padding: 32px 0 24px; }
+.landing .hero h1 { font-size: clamp(1.6rem, 6vw, 2.4rem); margin: 8px 0 12px; }
+.landing .hero p { max-width: 640px; margin-left: auto; margin-right: auto; }
+.landing .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 24px 0; }
+.landing .features .card { margin: 0; }
+.landing .features h2 { font-size: 1.05rem; margin: 4px 0 8px; }
