@@ -556,14 +556,12 @@ export class SupabaseRepository implements Repository {
     if (error || !data) throw new Error(`Supabase storage: ${error?.message ?? "no data"}`);
     return { meta: toAttachment(row), data: new Uint8Array(await data.arrayBuffer()) };
   }
+  // 予約フォームの送信回数は店舗ごとに数える（全体の上限がほかの店舗の予約を止めないように）
   async recordWebRequest(ip: string) {
-    check(await this.db.from("web_requests").insert({ ip }));
+    check(await this.q("web_requests").insert({ ip }));
   }
   async countWebRequests(since: Date, ip?: string) {
-    let query = this.db
-      .from("web_requests")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", since.toISOString());
+    let query = this.q("web_requests").select("id", { count: "exact", head: true }).gte("created_at", since.toISOString());
     if (ip) query = query.eq("ip", ip);
     const res = await query;
     if (res.error) throw new Error(`Supabase: ${res.error.message}`);
