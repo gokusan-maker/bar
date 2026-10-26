@@ -263,6 +263,14 @@ export async function simulatorSendAction(formData: FormData) {
   back("/admin/simulator", { user: userId });
 }
 
+/** はじめの設定のチェックリストを閉じる */
+export async function dismissSetupAction() {
+  await requireAdmin();
+  const repo = repository();
+  await repo.saveSettings({ ...(await repo.getSettings()), setupDismissed: true });
+  back("/admin");
+}
+
 export async function logoutAction() {
   const role = await currentRole();
   await logout();

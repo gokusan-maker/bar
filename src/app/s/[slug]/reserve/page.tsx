@@ -189,6 +189,9 @@ async function renderReserve(slug: string, params: { s?: string; at?: string; n?
         </>
       )}
       <Ad place="public" />
+      <footer className="site-footer">
+        <a href="/privacy">プライバシーポリシー</a>
+      </footer>
     </main>
   );
 }

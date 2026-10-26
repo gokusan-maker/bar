@@ -182,6 +182,8 @@ export interface ShopSettings {
   ownerNotifyLineUserId: string;
   /** オーナーのログインID（パスワードは ADMIN_PASSWORD） */
   ownerLoginId: string;
+  /** 最初の設定のチェックリストを閉じた */
+  setupDismissed: boolean;
   /** 誕生日の当日にLINEでお祝いを送る */
   birthdayGreetingEnabled: boolean;
   /** お祝いの文。{name} がお名前に置き換わる */
@@ -231,6 +233,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   ownerLineUserIds: [],
   ownerNotifyLineUserId: "",
   ownerLoginId: "admin",
+  setupDismissed: false,
   birthdayGreetingEnabled: false,
   birthdayMessage: "{name}様、お誕生日おめでとうございます🎂\n素敵な1年になりますように。今月ご来店の際は、お祝いに1杯サービスいたします🥂",
 };

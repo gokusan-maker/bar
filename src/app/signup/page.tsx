@@ -29,6 +29,7 @@ async function signupAction(formData: FormData) {
     await recordFailure(ip);
     back("登録コードが違います");
   }
+  if (formData.get("agree") !== "on") back("利用規約とプライバシーポリシーへの同意が必要です");
   if (String(formData.get("password")) !== String(formData.get("password2"))) back("確認用のパスワードが一致しません");
   const log = shopRepository(DEFAULT_SHOP_ID);
   if ((await log.countWebRequests(new Date(Date.now() - 3600_000), `signup:${ip}`)) >= MAX_SIGNUPS_PER_HOUR) {
@@ -96,6 +97,17 @@ export default async function SignupPage({
             <input name="signupCode" required autoComplete="off" />
           </label>
         )}
+        <label>
+          <input type="checkbox" name="agree" required />
+          <Link href="/terms" target="_blank">
+            利用規約
+          </Link>
+          と
+          <Link href="/privacy" target="_blank">
+            プライバシーポリシー
+          </Link>
+          に同意する
+        </label>
         <button type="submit" className="primary">
           お店を登録する
         </button>

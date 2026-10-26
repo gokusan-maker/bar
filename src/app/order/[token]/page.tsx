@@ -104,6 +104,9 @@ async function renderOrder(shopId: string, token: string, done: string | undefin
         </section>
       )}
       <Ad place="public" />
+      <footer className="site-footer">
+        <a href="/privacy">プライバシーポリシー</a>
+      </footer>
     </main>
   );
 }

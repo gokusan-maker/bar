@@ -8,12 +8,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "予約管理",
   description: "SNSの予約を自動で受け付けてGoogleカレンダーに反映するバー予約管理",
+  // ホーム画面に追加したときのアイコンと名前
+  icons: { icon: "/icon-192.png", apple: "/icon-180.png" },
+  appleWebApp: { capable: true, title: "バー予約", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#8a5a12",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -67,6 +67,11 @@ export default async function Home() {
           <li>スタッフに登録用リンクを送る（LINEでかんたん登録）</li>
         </ol>
       </section>
+
+      <footer className="site-footer">
+        <Link href="/terms">利用規約</Link>
+        <Link href="/privacy">プライバシーポリシー</Link>
+      </footer>
     </main>
   );
 }

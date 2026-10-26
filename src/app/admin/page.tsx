@@ -2,6 +2,8 @@ import Link from "next/link";
 import { currentRole } from "@/lib/auth";
 import { repository, reservationService } from "@/lib/container";
 import { Tonight } from "./tonight";
+import { setupSteps } from "@/lib/onboarding";
+import { SetupChecklist } from "./setup-checklist";
 import { addDays, DAY_MS, formatJa, fromJst, isValidDate, toJst, weekdayOf, weekdayJa } from "@/lib/domain/time";
 import type { Reservation } from "@/lib/domain/types";
 import { businessDayStart } from "@/lib/order-service";
@@ -23,6 +25,7 @@ export default async function AdminHome({
 }) {
   const params = await searchParams;
   const owner = (await currentRole()) === "owner";
+  const steps = owner && !(await repository().getSettings()).setupDismissed ? await setupSteps() : null;
   const now = new Date();
   const today = currentBusinessDate(now);
   const from = params.from && isValidDate(params.from) ? params.from : today;
@@ -48,6 +51,7 @@ export default async function AdminHome({
     <>
       {params.done && <p className="notice success">更新しました</p>}
       {params.forbidden && <p className="notice error">この画面は店主のみ利用できます</p>}
+      {steps && <SetupChecklist steps={steps} />}
       {from === today && (
         <Tonight
           date={today}
