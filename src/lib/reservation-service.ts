@@ -551,6 +551,21 @@ export class ReservationService {
     return r;
   }
 
+  /**
+   * お客様が「予約の確認・キャンセル」のページからキャンセルする（予約フォームで予約した方）。
+   * 承認待ち・確定で、まだ始まっていない予約だけ。店主に通知する。
+   */
+  async cancelByGuest(id: string): Promise<{ ok: true; reservation: Reservation } | { ok: false; error: string }> {
+    const r = await this.repo.getReservation(id);
+    if (!r || (r.status !== "pending" && r.status !== "confirmed")) return { ok: false, error: "このご予約はキャンセルできません" };
+    if (new Date(r.startAt) <= this.now()) return { ok: false, error: "ご予約の時間を過ぎたため、ここからはキャンセルできません。お店にご連絡ください" };
+    const updated = await this.repo.updateReservation(id, { status: "cancelled" });
+    await this.log("guest", "お客様がキャンセル（予約の確認ページ）", updated);
+    await this.safeCalendarRemove(updated);
+    await this.notifier.notify(`【キャンセル】${describe(updated)}（予約の確認ページから）`);
+    return { ok: true, reservation: updated };
+  }
+
   /** 店主が管理画面から手動で返信する */
   async sendManualReply(customerId: string, text: string): Promise<void> {
     const customer = await this.repo.getCustomer(customerId);

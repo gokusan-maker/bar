@@ -576,3 +576,31 @@ describe("birthday greetings", () => {
     expect(pushed[0]).toContain("うるう様");
   });
 });
+
+describe("guest self-cancel", () => {
+  it("cancels an upcoming booking once, notifies the owner, and refuses past or already cancelled ones", async () => {
+    const repo = new MemoryRepository();
+    await repo.saveSettings({ ...(await repo.getSettings()), closedWeekdays: [] });
+    const notices: string[] = [];
+    let now = fromJst("2026-10-20", "12:00");
+    const service = new ReservationService({
+      repo,
+      extractor: new RuleBasedExtractor(),
+      calendar: { upsert: async () => "e", remove: async () => {}, busyBlocks: async () => [], getEvent: async () => "deleted" as const },
+      messenger: { push: async () => {} },
+      notifier: { notify: async (t) => void notices.push(t) },
+      now: () => now,
+    });
+    const booked = await service.handleWebBooking({ source: "web", date: "2026-10-20", time: "21:00", partySize: 2, name: "山田", phone: "090-1234-5678", notes: null });
+    if (booked.status !== "confirmed" && booked.status !== "pending") throw new Error(`booking failed: ${booked.status}`);
+    const id = booked.reservation.id;
+    expect(await service.cancelByGuest(id)).toMatchObject({ ok: true, reservation: { status: "cancelled" } });
+    expect(notices.at(-1)).toContain("【キャンセル】");
+    expect(await service.cancelByGuest(id)).toMatchObject({ ok: false });
+
+    const again = await service.handleWebBooking({ source: "web", date: "2026-10-20", time: "22:00", partySize: 2, name: "山田", phone: "090-1234-5678", notes: null });
+    if (again.status !== "confirmed" && again.status !== "pending") throw new Error("booking failed");
+    now = fromJst("2026-10-20", "22:30");
+    expect(await service.cancelByGuest(again.reservation.id)).toMatchObject({ ok: false });
+  });
+});

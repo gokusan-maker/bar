@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Ad } from "@/app/ad";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { directory, repository, reservationService } from "@/lib/container";
+import { currentShopId, directory, repository, reservationService } from "@/lib/container";
+import { guestReservationToken, readGuestReservationToken } from "@/lib/guest-link";
 import { withShop } from "@/lib/shop-context";
 import { addDays, formatJa, toJst, weekdayJa, weekdayOf } from "@/lib/domain/time";
 import { DateTimePartyFields, type DateOption } from "./fields";
@@ -63,7 +64,9 @@ async function submitForShop(formData: FormData, base: string) {
     );
   }
   const r = result.reservation;
-  redirect(`${base}?s=${result.status}&at=${encodeURIComponent(r.startAt)}&n=${r.partySize}`);
+  // 自分で確認・キャンセルできるリンク
+  const t = guestReservationToken(await currentShopId(), r.id);
+  redirect(`${base}?s=${result.status}&at=${encodeURIComponent(r.startAt)}&n=${r.partySize}&t=${encodeURIComponent(t)}`);
 }
 
 /** 予約フォームに出す営業日（休業日を除く。最大60日先まで） */
@@ -93,7 +96,7 @@ export default async function ReservePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ s?: string; at?: string; n?: string; error?: string; from?: string }>;
+  searchParams: Promise<{ s?: string; at?: string; n?: string; error?: string; from?: string; t?: string }>;
 }) {
   const shop = await directory().getShopBySlug((await routeParams).slug);
   if (!shop?.active) notFound();
@@ -101,7 +104,7 @@ export default async function ReservePage({
   return withShop(shop.id, () => renderReserve(shop.slug, params));
 }
 
-async function renderReserve(slug: string, params: { s?: string; at?: string; n?: string; error?: string; from?: string }) {
+async function renderReserve(slug: string, params: { s?: string; at?: string; n?: string; error?: string; from?: string; t?: string }) {
   const settings = await repository().getSettings();
   const now = toJst(new Date());
   const today = now.time < "06:00" ? addDays(now.date, -1) : now.date;
@@ -147,9 +150,16 @@ async function renderReserve(slug: string, params: { s?: string; at?: string; n?
           )}
           <p className="muted" style={{ marginBottom: 0 }}>
             {params.s === "confirmed"
-              ? "当日お待ちしております。変更・キャンセルはお電話かSNSのメッセージでご連絡ください。"
+              ? "当日お待ちしております。"
               : "内容を確認のうえ、お店からお電話でご連絡いたします。"}
           </p>
+          {params.t && readGuestReservationToken(params.t) && (
+            <p style={{ marginBottom: 0 }}>
+              <a href={`/r/${encodeURIComponent(params.t)}`}>ご予約の確認・キャンセルはこちら</a>
+              <br />
+              <span className="muted">このページをブックマークするか、リンクを保存しておいてください。</span>
+            </p>
+          )}
         </section>
       ) : params.s === "ok" ? (
         <p className="notice success">送信しました。</p>
