@@ -1,17 +1,18 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
 import { repository, salesService } from "@/lib/container";
 import { addDays, toJst } from "@/lib/domain/time";
+import { summarizeForSale } from "@/lib/order-service";
 import type { SaleInput } from "@/lib/sales-service";
 import { SaleForm } from "../sale-form";
 
 export default async function NewSalePage({
   searchParams,
 }: {
-  searchParams: Promise<{ reservationId?: string; error?: string }>;
+  searchParams: Promise<{ reservationId?: string; error?: string; orders?: string }>;
 }) {
-  await requireAdmin();
-  const { reservationId, error } = await searchParams;
+  await requireStaff();
+  const { reservationId, error, orders: orderParam } = await searchParams;
   const repo = repository();
   const [settings, staff, allCustomers] = await Promise.all([
     repo.getSettings(),
@@ -38,7 +39,8 @@ export default async function NewSalePage({
       reservationId: null,
       customerId: null,
       staffId: null,
-      channel: "manual",
+      // いちばん多い経路を最初から選んでおく
+      channel: "line",
       customerName: null,
       partySize: 1,
       drinkAmount: 0,
@@ -48,11 +50,34 @@ export default async function NewSalePage({
     };
   }
 
+  // 注文画面の「会計」から来た場合は、その席の注文をお酒の金額に入れる
+  const orders = orderParam
+    ? (await Promise.all(orderParam.split(",").slice(0, 100).map((id) => repo.getOrder(id)))).filter(
+        (o) => o !== null && o.status !== "cancelled" && !o.saleId,
+      )
+    : [];
+  if (orders.length) {
+    const { total, note } = summarizeForSale(orders.map((o) => o!));
+    values = { ...values, drinkAmount: total, note: `注文: ${note}` };
+  }
+
   return (
     <>
       <h1>売上を登録</h1>
       {error && <p className="notice error">{error}</p>}
-      <SaleForm values={values} staff={staff} settings={settings} withFiles customers={customers} />
+      {orders.length > 0 && (
+        <p className="notice">
+          {orders[0]!.tableName}の注文 {orders.length}件をお酒の金額に入れました。人数・料金・担当を確認して登録してください。
+        </p>
+      )}
+      <SaleForm
+        values={values}
+        staff={staff}
+        settings={settings}
+        withFiles
+        customers={customers}
+        orderIds={orders.map((o) => o!.id)}
+      />
     </>
   );
 }

@@ -1,11 +1,11 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import Link from "next/link";
 import { repository } from "@/lib/container";
 import { formatJa } from "@/lib/domain/time";
 import { CHANNEL_LABEL } from "../ui";
 
 export default async function InboxPage() {
-  await requireAdmin();
+  await requireStaff();
   const conversations = await repository().listRecentConversations(50);
   return (
     <>

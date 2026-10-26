@@ -521,3 +521,86 @@ describe("ReservationService", () => {
     expect(notices.at(-1)).toContain("予約フォーム（X経由）");
   });
 });
+
+describe("birthday greetings", () => {
+  it("greets LINE customers on their birthday once a year", async () => {
+    const repo = new MemoryRepository();
+    await repo.saveSettings({ ...(await repo.getSettings()), birthdayGreetingEnabled: true, birthdayMessage: "{name}様おめでとう" });
+    const pushed: string[] = [];
+    const notices: string[] = [];
+    let now = fromJst("2026-10-30", "12:00");
+    const make = () =>
+      new ReservationService({
+        repo,
+        extractor: new RuleBasedExtractor(),
+        calendar: { upsert: async () => "e", remove: async () => {}, busyBlocks: async () => [], getEvent: async () => "deleted" as const },
+        messenger: { push: async (c, text) => void pushed.push(`${c.externalId}:${text}`) },
+        notifier: { notify: async (t) => void notices.push(t) },
+        now: () => now,
+      });
+    const line = await repo.findOrCreateCustomer("line", "U1", "やまだ");
+    await repo.updateCustomer(line.id, { name: "山田", birthday: "10-30" });
+    const other = await repo.findOrCreateCustomer("line", "U2", "さとう");
+    await repo.updateCustomer(other.id, { birthday: "10-31" });
+    // 電話で登録したお客様にはアプリから送れない
+    await repo.createCustomer({ channel: "manual", name: "鈴木", phone: "09000000000", birthday: "10-30", tags: [], note: null, staffId: null });
+
+    expect(await make().sendBirthdayGreetings()).toBe(1);
+    expect(pushed).toEqual(["U1:山田様おめでとう"]);
+    expect(notices[0]).toContain("1名");
+    expect(await make().sendBirthdayGreetings()).toBe(0); // 同じ年は一度だけ
+
+    now = fromJst("2027-10-30", "12:00");
+    expect(await make().sendBirthdayGreetings()).toBe(1);
+
+    await repo.saveSettings({ ...(await repo.getSettings()), birthdayGreetingEnabled: false });
+    now = fromJst("2028-10-30", "12:00");
+    expect(await make().sendBirthdayGreetings()).toBe(0);
+  });
+
+  it("greets Feb 29 birthdays on Feb 28 in non-leap years", async () => {
+    const repo = new MemoryRepository();
+    await repo.saveSettings({ ...(await repo.getSettings()), birthdayGreetingEnabled: true });
+    const pushed: string[] = [];
+    const c = await repo.findOrCreateCustomer("line", "U1", "うるう");
+    await repo.updateCustomer(c.id, { birthday: "02-29" });
+    const service = new ReservationService({
+      repo,
+      extractor: new RuleBasedExtractor(),
+      calendar: { upsert: async () => "e", remove: async () => {}, busyBlocks: async () => [], getEvent: async () => "deleted" as const },
+      messenger: { push: async (_c, text) => void pushed.push(text) },
+      notifier: { notify: async () => {} },
+      now: () => fromJst("2027-02-28", "12:00"),
+    });
+    expect(await service.sendBirthdayGreetings()).toBe(1);
+    expect(pushed[0]).toContain("うるう様");
+  });
+});
+
+describe("guest self-cancel", () => {
+  it("cancels an upcoming booking once, notifies the owner, and refuses past or already cancelled ones", async () => {
+    const repo = new MemoryRepository();
+    await repo.saveSettings({ ...(await repo.getSettings()), closedWeekdays: [] });
+    const notices: string[] = [];
+    let now = fromJst("2026-10-20", "12:00");
+    const service = new ReservationService({
+      repo,
+      extractor: new RuleBasedExtractor(),
+      calendar: { upsert: async () => "e", remove: async () => {}, busyBlocks: async () => [], getEvent: async () => "deleted" as const },
+      messenger: { push: async () => {} },
+      notifier: { notify: async (t) => void notices.push(t) },
+      now: () => now,
+    });
+    const booked = await service.handleWebBooking({ source: "web", date: "2026-10-20", time: "21:00", partySize: 2, name: "山田", phone: "090-1234-5678", notes: null });
+    if (booked.status !== "confirmed" && booked.status !== "pending") throw new Error(`booking failed: ${booked.status}`);
+    const id = booked.reservation.id;
+    expect(await service.cancelByGuest(id)).toMatchObject({ ok: true, reservation: { status: "cancelled" } });
+    expect(notices.at(-1)).toContain("【キャンセル】");
+    expect(await service.cancelByGuest(id)).toMatchObject({ ok: false });
+
+    const again = await service.handleWebBooking({ source: "web", date: "2026-10-20", time: "22:00", partySize: 2, name: "山田", phone: "090-1234-5678", notes: null });
+    if (again.status !== "confirmed" && again.status !== "pending") throw new Error("booking failed");
+    now = fromJst("2026-10-20", "22:30");
+    expect(await service.cancelByGuest(again.reservation.id)).toMatchObject({ ok: false });
+  });
+});

@@ -551,6 +551,21 @@ export class ReservationService {
     return r;
   }
 
+  /**
+   * お客様が「予約の確認・キャンセル」のページからキャンセルする（予約フォームで予約した方）。
+   * 承認待ち・確定で、まだ始まっていない予約だけ。店主に通知する。
+   */
+  async cancelByGuest(id: string): Promise<{ ok: true; reservation: Reservation } | { ok: false; error: string }> {
+    const r = await this.repo.getReservation(id);
+    if (!r || (r.status !== "pending" && r.status !== "confirmed")) return { ok: false, error: "このご予約はキャンセルできません" };
+    if (new Date(r.startAt) <= this.now()) return { ok: false, error: "ご予約の時間を過ぎたため、ここからはキャンセルできません。お店にご連絡ください" };
+    const updated = await this.repo.updateReservation(id, { status: "cancelled" });
+    await this.log("guest", "お客様がキャンセル（予約の確認ページ）", updated);
+    await this.safeCalendarRemove(updated);
+    await this.notifier.notify(`【キャンセル】${describe(updated)}（予約の確認ページから）`);
+    return { ok: true, reservation: updated };
+  }
+
   /** 店主が管理画面から手動で返信する */
   async sendManualReply(customerId: string, text: string): Promise<void> {
     const customer = await this.repo.getCustomer(customerId);
@@ -680,7 +695,7 @@ export class ReservationService {
     // 同じ電話番号のお客様は同じ人として扱う
     const channel = input.source === "x" ? "x" : "web";
     const customer = await this.repo.findOrCreateCustomer(channel, phone, name);
-    if (customer.name !== name) await this.repo.updateCustomer(customer.id, { name });
+    if (customer.name !== name || customer.phone !== phone) await this.repo.updateCustomer(customer.id, { name, phone });
     const end = availability.ok ? availability.end : new Date(start.getTime() + settings.stayMinutes * 60_000);
     let reservation = await this.repo.createReservation({
       customerId: customer.id,
@@ -912,6 +927,35 @@ export class ReservationService {
       await this.log("system", "リマインド送信", r);
       sent++;
     }
+    return sent;
+  }
+
+  /** 誕生日の当日（12時の定期処理）に、LINEのお客様へお祝いを送る。同じ年には一度だけ */
+  async sendBirthdayGreetings(): Promise<number> {
+    const settings = await this.repo.getSettings();
+    if (!settings.birthdayGreetingEnabled || !settings.birthdayMessage.trim()) return 0;
+    const today = toJst(this.now()).date;
+    const year = Number(today.slice(0, 4));
+    const mmdd = today.slice(5);
+    // うるう年でない年は、2/29生まれの方に2/28に送る
+    const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    const matches = (b: string | null) => b === mmdd || (b === "02-29" && mmdd === "02-28" && !isLeap(year));
+    const targets = (await this.repo.listCustomers({ limit: 10000 })).filter(
+      (c) => c.channel === "line" && c.externalId && matches(c.birthday) && c.birthdayGreetedYear !== year,
+    );
+    let sent = 0;
+    for (const c of targets) {
+      const text = settings.birthdayMessage.replaceAll("{name}", c.name ?? c.displayName ?? "お客");
+      try {
+        await this.messenger.push(c, text);
+        await this.repo.addMessage({ customerId: c.id, direction: "out", text, extraction: null });
+        await this.repo.updateCustomer(c.id, { birthdayGreetedYear: year });
+        sent++;
+      } catch (error) {
+        console.error("birthday greeting failed", error);
+      }
+    }
+    if (sent) await this.notifier.notify(`🎂 本日お誕生日のお客様${sent}名にLINEでお祝いを送りました`);
     return sent;
   }
 }
