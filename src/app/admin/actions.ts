@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { currentRole, logout, requireAdmin, requireStaff } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
-import { repository, reservationService } from "@/lib/container";
+import { currentShopId, directory, repository, reservationService } from "@/lib/container";
+import { isValidSlug } from "@/lib/directory";
 import { isThemeKey } from "@/lib/domain/theme";
-import type { ShopSettings } from "@/lib/domain/types";
+import { loginIdProblem, normalizeLoginId } from "@/lib/staff-accounts";
+import type { ShopSecrets, ShopSettings } from "@/lib/domain/types";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const int = (f: FormData, k: string) => Number.parseInt(str(f, k), 10);
@@ -111,7 +113,9 @@ export async function saveSettingsAction(formData: FormData) {
   const backTarget = str(formData, "backTarget");
   const rate = Number(str(formData, "serviceChargeRate"));
 
+  // この画面にない項目（注文・集客・招待リンクなど）はそのまま残す
   const settings: ShopSettings = {
+    ...current,
     shopName: str(formData, "shopName") || current.shopName,
     shopType: str(formData, "shopType") || current.shopType,
     seatAreas,
@@ -146,8 +150,65 @@ export async function saveSettingsAction(formData: FormData) {
       : "",
   };
   await repo.saveSettings(settings);
+  // 店舗の一覧（運営の画面・ログインの表示）の店名もそろえる
+  if (settings.shopName !== current.shopName) await directory().updateShop(await currentShopId(), { name: settings.shopName });
   await recordAudit({ actor: "owner", action: "設定を変更", targetType: "settings", targetId: null, detail: null });
   back("/admin/settings", { saved: "1" });
+}
+
+/** このお店のLINE公式アカウント・Instagramの接続情報（暗号化して保存。空欄は今の値のまま） */
+export async function saveSnsConnectionsAction(formData: FormData) {
+  await requireAdmin();
+  const repo = repository();
+  const current = await repo.getSecrets();
+  const next: ShopSecrets = { ...current };
+  for (const key of ["lineChannelSecret", "lineChannelAccessToken", "instagramAccessToken", "instagramAppSecret", "instagramVerifyToken"] as const) {
+    const value = str(formData, key);
+    if (formData.get(`${key}Clear`) === "on") delete next[key];
+    else if (value) next[key] = value.slice(0, 500);
+  }
+  await repo.saveSecrets(next);
+  const notifyId = str(formData, "ownerNotifyLineUserId");
+  if (notifyId && !/^U[0-9a-f]{32}$/.test(notifyId)) back("/admin/settings", { error: "店主への通知先は U で始まる33文字のユーザーIDを入れてください" });
+  await repo.saveSettings({ ...(await repo.getSettings()), ownerNotifyLineUserId: notifyId });
+  await recordAudit({ actor: "owner", action: "SNSの接続を変更", targetType: "integration", targetId: null, detail: null });
+  back("/admin/settings", { saved: "1" });
+}
+
+/** お店のURL名（予約フォームなどのアドレス） */
+export async function saveShopSlugAction(formData: FormData) {
+  await requireAdmin();
+  const slug = str(formData, "slug").toLowerCase();
+  if (!isValidSlug(slug)) back("/admin/settings", { error: "URL名は2〜31文字の半角英小文字・数字・ハイフンにしてください" });
+  const dir = directory();
+  const shopId = await currentShopId();
+  const other = await dir.getShopBySlug(slug);
+  if (other && other.id !== shopId) back("/admin/settings", { error: "このURL名はすでに使われています" });
+  await dir.updateShop(shopId, { slug });
+  await recordAudit({ actor: "owner", action: "お店のURL名を変更", targetType: "settings", targetId: null, detail: slug });
+  back("/admin/settings", { saved: "1" });
+}
+
+/** オーナーのログインID（パスワードは ADMIN_PASSWORD のまま） */
+export async function saveOwnerLoginIdAction(formData: FormData) {
+  await requireAdmin();
+  const id = normalizeLoginId(str(formData, "ownerLoginId"));
+  const problem = loginIdProblem(id);
+  if (problem) back("/admin/settings", { error: problem });
+  const repo = repository();
+  if (await directory().findMemberByLoginId(id)) back("/admin/settings", { error: "このIDはスタッフが使っています" });
+  await repo.saveSettings({ ...(await repo.getSettings()), ownerLoginId: id });
+  await recordAudit({ actor: "owner", action: "オーナーのログインIDを変更", targetType: "settings", targetId: null, detail: id });
+  back("/admin/settings", { saved: "1" });
+}
+
+/** オーナーのLINEログインの連携を外す（パスワードでのログインは残る） */
+export async function unlinkOwnerLineAction() {
+  await requireAdmin();
+  const repo = repository();
+  await repo.saveSettings({ ...(await repo.getSettings()), ownerLineUserIds: [] });
+  await recordAudit({ actor: "owner", action: "店主のLINEログインの連携を解除", targetType: "settings", targetId: null, detail: null });
+  back("/admin/settings", { line: "unlinked" });
 }
 
 export async function saveCalendarAction(formData: FormData) {
@@ -174,7 +235,7 @@ export async function disconnectGoogleAction() {
 }
 
 export async function manualReplyAction(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const customerId = str(formData, "customerId");
   const text = str(formData, "text");
   if (text) {
@@ -185,13 +246,6 @@ export async function manualReplyAction(formData: FormData) {
     }
   }
   back(`/admin/customers/${customerId}`);
-}
-
-export async function saveCustomerNoteAction(formData: FormData) {
-  await requireAdmin();
-  const customerId = str(formData, "customerId");
-  await repository().updateCustomer(customerId, { note: str(formData, "note") || null });
-  back(`/admin/customers/${customerId}`, { saved: "1" });
 }
 
 export async function simulatorSendAction(formData: FormData) {
@@ -209,7 +263,16 @@ export async function simulatorSendAction(formData: FormData) {
   back("/admin/simulator", { user: userId });
 }
 
+/** はじめの設定のチェックリストを閉じる */
+export async function dismissSetupAction() {
+  await requireAdmin();
+  const repo = repository();
+  await repo.saveSettings({ ...(await repo.getSettings()), setupDismissed: true });
+  back("/admin");
+}
+
 export async function logoutAction() {
+  const role = await currentRole();
   await logout();
-  redirect("/login");
+  redirect(role === "owner" ? "/owner/login" : "/login");
 }

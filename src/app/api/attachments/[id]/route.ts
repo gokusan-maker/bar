@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/auth";
+import { currentRole } from "@/lib/auth";
 import { repository } from "@/lib/container";
 
-/** 証拠写真の表示・ダウンロード（管理者のみ） */
+/** 証拠写真の表示・ダウンロード（ログイン中の店主・スタッフ） */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await currentRole())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
   const file = await repository().getAttachment(id);
   if (!file) return NextResponse.json({ error: "not found" }, { status: 404 });

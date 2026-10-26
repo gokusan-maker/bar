@@ -164,8 +164,7 @@ export class SalesService {
 }
 
 export function validateBackRates(rates: BackRates): string | null {
-  const pct = [rates.drink, rates.charge, rates.service];
-  if (!pct.every((r) => Number.isFinite(r) && r >= 0 && r <= 100)) return "バック率は0〜100%で入力してください";
+  if (!Number.isFinite(rates.rate) || rates.rate < 0 || rates.rate > 100) return "バック率は0〜100%で入力してください";
   if (!Number.isInteger(rates.perVisit) || rates.perVisit < 0) return "固定バックは0以上の整数（円）で入力してください";
   return null;
 }
